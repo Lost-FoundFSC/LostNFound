@@ -1,11 +1,11 @@
-import React, { useState } from 'react'
+import { useState } from 'react';
 import { INITIAL_REPORT, REPORT_CATEGORIES, REPORT_FIELDS } from '../data/reportFields'
 import './ReportPage.css'
 import { isValidIncidentDate } from '../utils/reportValidation'
 
 const CAMPUS_LOCATIONS = ['Campus Center', 'Greenley Library', 'Whitman Hall', 'Hale Hall', 'Lupton Hall', 'Nold Hall', 'Other / Unsure']
 
-function Field({ label, name, children, help }) {
+function Field({ label, children, help }) {
   return <label className="report-field"><span>{label}</span>{children}{help && <small>{help}</small>}</label>
 }
 function Section({ title, subtitle, children }) {
@@ -19,18 +19,39 @@ const update = (name, value) => { setValues(previous => ({ ...previous, [name]: 
 }
   const inputProps = name => ({ name: REPORT_FIELDS[name], value: values[name], onChange: event => update(name, event.target.value) })
 
-function submit(event) {
-  event.preventDefault()
 
+async function submit(event) {
+  event.preventDefault();
+
+  // Validate incident date before submitting
   if (!isValidIncidentDate(values.incidentDate)) {
-    window.alert('Please enter a valid date that is not in the future.')
-    return
+    window.alert('Please enter a valid date that is not in the future.');
+    return;
   }
 
+  // Submit the report to the Django backend
   if (event.currentTarget.reportValidity()) {
-    onNavigate('report-confirmation')
+    try {
+      const response = await fetch('http://localhost:8000/api/reports/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(values),
+      });
+
+      if (response.ok) {
+        onNavigate('report-confirmation');
+      } else {
+        window.alert('Failed to submit report. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      window.alert('Unable to connect to the server. Please try again.');
+    }
   }
 }
+
 
 
   return <div className="report-page">
@@ -74,7 +95,6 @@ function submit(event) {
           </Section>
       </div>
     </form>
-    <p className="report-disclaimer">Frontend prototype only. No student data, reports, files, or locations are stored or sent to a server.</p>
     {onNavigate && <button type="button" className="report-back" onClick={() => onNavigate('my-account')}>← Back to My Account</button>}
   </div>
 

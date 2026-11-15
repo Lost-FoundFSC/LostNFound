@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react'
-import Sidebar, { NAV_ITEMS } from './components/Sidebar'
+import { useState, useEffect } from 'react';
+import Sidebar from "./components/Sidebar";
+import { NAV_ITEMS } from "./components/navItems";
 import Icon from './components/Icon'
 import HomePage from './pages/HomePage'
 import SignInPage from './pages/SignInPage'
@@ -9,6 +10,7 @@ import './styles/tokens.css'
 import './App.css'
 import ReportPage from './pages/ReportPage'
 import ReportConfirmationPage from './pages/ReportConfirmationPage'
+import PossibleMatchesPage from './pages/PossibleMatchesPage'
 
 const knownPages = new Set([
   ...NAV_ITEMS.map(item => item.key),
@@ -51,6 +53,8 @@ export default function App() {
   <ReportPage onNavigate={navigate} />
 ) : activePage === 'report-confirmation' ? (
   <ReportConfirmationPage onNavigate={navigate} />
+) : activePage === 'possible-matches' ? (
+  <PossibleMatchesPage onNavigate={navigate} />
 ) : (
   <PlaceholderPage page={activePage} onNavigate={navigate} />
 )}
