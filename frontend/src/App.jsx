@@ -10,11 +10,14 @@ import './styles/tokens.css'
 import './App.css'
 import ReportPage from './pages/ReportPage'
 import ReportConfirmationPage from './pages/ReportConfirmationPage'
+import LogoutPage from './pages/LogoutPage'
 import PossibleMatchesPage from './pages/PossibleMatchesPage'
 
 const knownPages = new Set([
   ...NAV_ITEMS.map(item => item.key),
   'report-confirmation',
+  'logout',
+  'possible-matches',
 ])
 
 function readPage() {
@@ -53,6 +56,9 @@ export default function App() {
   <ReportPage onNavigate={navigate} />
 ) : activePage === 'report-confirmation' ? (
   <ReportConfirmationPage onNavigate={navigate} />
+
+) : activePage === 'logout' ? (
+  <LogoutPage onNavigate={navigate} />
 ) : activePage === 'possible-matches' ? (
   <PossibleMatchesPage onNavigate={navigate} />
 ) : (
