@@ -43,6 +43,28 @@ describe('ReportPage', () => {
     expect(field(/^Student ID/)).not.toBeRequired();
   });
 
+  it('does not require the date or campus location', () => {
+    render(<ReportPage />);
+    expect(field(/^Date last seen/)).not.toBeRequired();
+    expect(field(/^Campus location/)).not.toBeRequired();
+    expect(field(/^Date last seen/).closest('label')).not.toHaveTextContent('*');
+    expect(screen.getByText('Optional. An estimate is OK.')).toBeInTheDocument();
+  });
+
+  it('submits without a date or campus location', async () => {
+    const fetchMock = mockFetch(201, { formId: 'L#591829326', reportType: 'lost' });
+    const onNavigate = vi.fn();
+    render(<ReportPage onNavigate={onNavigate} />);
+    fillValidForm();
+    set(/^Date last seen/, '');
+    set(/^Campus location/, '');
+    fireEvent.click(submitButton());
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith('report-confirmation'));
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent.incidentDate).toBe('');
+    expect(sent.campusLocation).toBe('');
+  });
+
   it('explains the RAM ID format', () => {
     render(<ReportPage />);
     expect(screen.getByText(/R followed by exactly 8 digits/i)).toBeInTheDocument();

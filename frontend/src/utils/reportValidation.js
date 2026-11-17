@@ -38,9 +38,7 @@ export const REPORT_ERRORS = Object.freeze({
   itemName: 'Enter the item name.',
   description: 'Describe the item.',
   estimatedValue: 'Enter a value of 0 or more, or leave it blank.',
-  incidentDateRequired: 'Enter the date.',
   incidentDateFuture: 'The date cannot be in the future.',
-  campusLocation: 'Choose a campus location.',
   liabilityAccepted: 'You must acknowledge the notice to submit.',
 })
 
@@ -71,10 +69,11 @@ export function validateReport(values, today = new Date()) {
     if (!Number.isFinite(value) || value < 0) errors.estimatedValue = REPORT_ERRORS.estimatedValue
   }
 
-  if (!text('incidentDate')) errors.incidentDate = REPORT_ERRORS.incidentDateRequired
-  else if (!isValidIncidentDate(text('incidentDate'), today)) errors.incidentDate = REPORT_ERRORS.incidentDateFuture
-
-  if (!text('campusLocation')) errors.campusLocation = REPORT_ERRORS.campusLocation
+  // Date and campus location are optional (a best guess is fine),
+  // but a date that is filled in cannot be in the future.
+  if (text('incidentDate') && !isValidIncidentDate(text('incidentDate'), today)) {
+    errors.incidentDate = REPORT_ERRORS.incidentDateFuture
+  }
   if (!values.liabilityAccepted) errors.liabilityAccepted = REPORT_ERRORS.liabilityAccepted
 
   return errors

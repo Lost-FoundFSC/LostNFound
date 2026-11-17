@@ -199,6 +199,20 @@ class SubmitReportTests(TempMediaMixin, APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('incidentDate', response.data)
 
+    def test_date_and_location_optional(self):
+        response = self.client.post(
+            self.url, payload(incidentDate='', campusLocation=''), format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        report = LostReport.objects.get(form_id=response.data['formId'])
+        self.assertIsNone(report.incident_date)
+        self.assertEqual(report.campus_location, '')
+
+    def test_date_and_location_can_be_left_out(self):
+        data = payload()
+        del data['incidentDate'], data['campusLocation']
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+
     def test_liability_must_be_accepted(self):
         response = self.client.post(self.url, payload(liabilityAccepted=False), format='json')
         self.assertEqual(response.status_code, 400)
@@ -369,6 +383,12 @@ class ProgressTests(TempMediaMixin, UsersMixin, APITestCase):
         self.assertFalse(data['isActive'])
         self.assertIsNotNone(data['archiveSemester'])
 
+    def test_progress_without_date_or_location(self):
+        form_id = self.submit(incidentDate='', campusLocation='').data['formId']
+        data = self.progress(form_id).data
+        self.assertIsNone(data['incidentDate'])
+        self.assertEqual(data['campusLocation'], '')
+
     def test_unknown_form_id_404(self):
         self.assertEqual(self.progress('L#000000001').status_code, 404)
 
@@ -477,6 +497,12 @@ class SecurityAndArchiveTests(TempMediaMixin, UsersMixin, APITestCase):
         self.client.force_authenticate(self.security)
         photo = self.client.get(response.data['images'][0]['url'])
         self.assertEqual(photo.status_code, 200)
+
+    def test_report_without_date_or_location_archives(self):
+        form_id = self.submit(incidentDate='', campusLocation='').data['formId']
+        response = self.set_status(form_id, 'returned')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.data['incidentDate'])
 
     def test_closed_and_cancelled_also_archive(self):
         other = self.submit(reportType='found').data['formId']

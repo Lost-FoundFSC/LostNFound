@@ -141,14 +141,14 @@ export default function ReportPage({ onNavigate, onSubmitted }) {
           <Field label="Report type" required><select {...inputProps('reportType')} required><option value="lost">Lost item</option><option value="found">Found item</option></select></Field>
           <div className="report-choice-hint">{values.reportType === 'lost' ? 'I lost something and would like help finding it.' : 'I found something and want to help return it.'}</div>
         </Section>
-        <Section title="Time and location" subtitle="Tell us when and where you last saw the item.">
-          <Field label={values.reportType === 'lost' ? 'Date last seen' : 'Date found'} required {...fieldProps('incidentDate')}><input {...inputProps('incidentDate')} type="date" required /></Field>
+        <Section title="Time and location" subtitle="Tell us when and where you last saw the item. If you're not sure, a best guess is fine, or leave it blank.">
+          <Field label={values.reportType === 'lost' ? 'Date last seen' : 'Date found'} help="Optional. An estimate is OK." helpId="incidentDate-help" {...fieldProps('incidentDate')}><input {...inputProps('incidentDate', 'incidentDate-help')} type="date" max={new Date().toLocaleDateString('en-CA')} /></Field>
           <Field label="Approximate time" {...fieldProps('incidentTime')}><input {...inputProps('incidentTime')} type="time" /></Field>
-          <Field label="Campus location" required {...fieldProps('campusLocation')}><select {...inputProps('campusLocation')} required><option value="">Select campus location</option>{CAMPUS_LOCATIONS.map(location => <option value={location} key={location}>{location}</option>)}</select></Field>
+          <Field label="Campus location" help="Optional. Pick the closest building, or Other / Unsure." helpId="campusLocation-help" {...fieldProps('campusLocation')}><select {...inputProps('campusLocation', 'campusLocation-help')}><option value="">Select campus location</option>{CAMPUS_LOCATIONS.map(location => <option value={location} key={location}>{location}</option>)}</select></Field>
         </Section>
         <Section title="Approximate location" subtitle="Use the map area as a reference and describe where the item was lost or found.">
           <div className="report-map" aria-label="Campus map placeholder; map integration has not been added"><div className="report-map-mark">⌖</div><strong>Farmingdale State College</strong><span>Campus map preview</span><small>Map integration pending — this is not a verified map or selected location.</small></div>
-          <div className="report-location-readout"><strong>Selected area</strong><span>{values.campusLocation || 'Choose a campus location above'}</span></div>
+          <div className="report-location-readout"><strong>Selected area</strong><span>{values.campusLocation || 'Not specified'}</span></div>
           <div className="report-info">ⓘ Add landmarks, building entrances, room numbers, or nearby locations to help identify the area. Do not include sensitive personal information.</div>
           <Field label="Describe the exact location" {...fieldProps('locationDetails')}><textarea {...inputProps('locationDetails')} rows={4} placeholder="e.g. Near the entrance to the library" maxLength={1000} /></Field>
         </Section>

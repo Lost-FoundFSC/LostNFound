@@ -65,9 +65,13 @@ describe('validateReport', () => {
     expect(validateReport({ ...valid, phone: '+1 (516) 551-2685' }, today).phone).toBeUndefined()
   })
 
-  it('requires item details, date, location, and the notice', () => {
-    const errors = validateReport({ ...valid, category: '', itemName: '', description: '', incidentDate: '', campusLocation: '', liabilityAccepted: false }, today)
-    expect(Object.keys(errors).sort()).toEqual(['campusLocation', 'category', 'description', 'incidentDate', 'itemName', 'liabilityAccepted'])
+  it('requires item details and the notice', () => {
+    const errors = validateReport({ ...valid, category: '', itemName: '', description: '', liabilityAccepted: false }, today)
+    expect(Object.keys(errors).sort()).toEqual(['category', 'description', 'itemName', 'liabilityAccepted'])
+  })
+
+  it('allows the date and campus location to be left blank', () => {
+    expect(validateReport({ ...valid, incidentDate: '', campusLocation: '' }, today)).toEqual({})
   })
 
   it('rejects future dates and negative values', () => {

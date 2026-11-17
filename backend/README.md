@@ -157,7 +157,9 @@ The POST body uses the same camelCase field names as
 
 - Name, email, and phone are required. The phone must have 10 digits
   (a leading +1 is allowed) and is stored as (516) 555-1234.
-- The date cannot be in the future.
+- The date (`incidentDate`) and campus location are optional, since
+  people often only know roughly when or where. A date that is given
+  cannot be in the future.
 - The liability notice must be accepted.
 - The category must be one of the form's categories.
 - The RAM ID is optional, but if given it must be R plus 8 digits

@@ -28,11 +28,15 @@ class ReportSerializer(serializers.ModelSerializer):
         source='estimated_value', max_digits=9, decimal_places=2,
         min_value=0, required=False, allow_null=True,
     )
-    incidentDate = serializers.DateField(source='incident_date')
+    incidentDate = serializers.DateField(
+        source='incident_date', required=False, allow_null=True,
+    )
     incidentTime = serializers.TimeField(
         source='incident_time', required=False, allow_null=True,
     )
-    campusLocation = serializers.CharField(source='campus_location', max_length=100)
+    campusLocation = serializers.CharField(
+        source='campus_location', max_length=100, required=False, allow_blank=True,
+    )
     locationDetails = serializers.CharField(
         source='location_details', max_length=1000, required=False, allow_blank=True,
     )
@@ -69,7 +73,7 @@ class ReportSerializer(serializers.ModelSerializer):
         # Photos are handled separately in the view, so only text fields are kept.
         data = {key: data.get(key) for key in data if key != 'images'}
         # The HTML form sends '' for empty optional number/time inputs.
-        for key in ('estimatedValue', 'incidentTime', 'mapLatitude', 'mapLongitude'):
+        for key in ('estimatedValue', 'incidentDate', 'incidentTime', 'mapLatitude', 'mapLongitude'):
             if data.get(key) == '':
                 data[key] = None
         return super().to_internal_value(data)
@@ -114,7 +118,7 @@ class ReportSerializer(serializers.ModelSerializer):
         return ram_id
 
     def validate_incidentDate(self, value):
-        if value > timezone.localdate():
+        if value and value > timezone.localdate():
             raise serializers.ValidationError('Date cannot be in the future.')
         return value
 
@@ -160,7 +164,7 @@ class ProgressSerializer(serializers.Serializer):
     itemName = serializers.CharField(source='item_name')
     category = serializers.CharField()
     campusLocation = serializers.CharField(source='campus_location')
-    incidentDate = serializers.DateField(source='incident_date')
+    incidentDate = serializers.DateField(source='incident_date', allow_null=True)
     status = serializers.CharField()
     statusLabel = serializers.SerializerMethodField()
     isActive = serializers.BooleanField(source='is_active')

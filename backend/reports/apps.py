@@ -2,9 +2,16 @@ from django.apps import AppConfig
 from django.db.models.signals import post_migrate
 
 
-def create_campus_security_group(sender, **kwargs):
+def create_campus_security_group(sender, using='default', **kwargs):
     """Create the Campus Security group with view/change rights on reports."""
     from django.contrib.auth.models import Group, Permission
+    from django.db import connections
+
+    # Skip if Django's user/permission tables have not been created yet
+    # (for example when only this app is migrated on a new database).
+    tables = connections[using].introspection.table_names()
+    if 'auth_group' not in tables or 'auth_permission' not in tables:
+        return
 
     from .permissions import CAMPUS_SECURITY_GROUP
 

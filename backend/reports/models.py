@@ -106,10 +106,11 @@ class ReportFields(models.Model):
         validators=[MinValueValidator(0)],
     )
 
-    # When / where
-    incident_date = models.DateField()
+    # When / where. Optional: the person may not know exactly, so these
+    # can be left blank or be a best guess.
+    incident_date = models.DateField(null=True, blank=True)
     incident_time = models.TimeField(null=True, blank=True)
-    campus_location = models.CharField(max_length=100)
+    campus_location = models.CharField(max_length=100, blank=True)
     location_details = models.TextField(max_length=1000, blank=True)
 
     # Map pin. Reserved for the upcoming campus map feature: optional and
