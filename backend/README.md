@@ -20,8 +20,6 @@ cd backend
 python3.13 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver
 ```
 
 ### Windows (PowerShell)
@@ -31,12 +29,48 @@ cd backend
 py -3.13 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver
 ```
 
 If PowerShell blocks activation, run the virtual environment's
 Python executable directly instead.
+
+### Environment Configuration
+
+Create a local `.env` file from the provided example.
+
+**macOS / Linux:**
+```bash
+cp .env.example .env
+```
+
+**Windows (PowerShell):**
+```powershell
+Copy-Item .env.example .env
+```
+
+Generate a unique Django secret key:
+
+```bash
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
+
+Open `.env` and replace `replace_with_your_own_generated_key`
+with the generated value.
+
+Django automatically loads `.env` through `python-dotenv`.
+
+Never commit `.env` or share your secret key.
+
+
+### Initialize and Run the Backend
+
+After configuring your `.env` file, run:
+
+```bash
+python manage.py migrate
+python manage.py runserver
+```
+
 
 ## Health-check endpoint
 
