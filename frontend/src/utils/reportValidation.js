@@ -78,3 +78,31 @@ export function validateReport(values, today = new Date()) {
 
   return errors
 }
+
+// Photo rules, same as the backend (backend/reports/images.py).
+export const MAX_PHOTOS = 5
+export const MAX_PHOTO_BYTES = 5 * 1024 * 1024
+export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+/**
+ * Splits newly picked files into ones that can be added and error messages
+ * for the ones that cannot.
+ * @returns {{ accepted: File[], errors: string[] }}
+ */
+export function checkPhotos(newFiles, currentCount = 0) {
+  const accepted = []
+  const errors = []
+  for (const file of newFiles) {
+    if (!PHOTO_TYPES.includes(file.type)) {
+      errors.push(`${file.name}: only JPEG, PNG, or WebP photos can be uploaded.`)
+    } else if (file.size > MAX_PHOTO_BYTES) {
+      errors.push(`${file.name}: photo is larger than 5 MB.`)
+    } else if (currentCount + accepted.length >= MAX_PHOTOS) {
+      errors.push(`You can add up to ${MAX_PHOTOS} photos.`)
+      break
+    } else {
+      accepted.push(file)
+    }
+  }
+  return { accepted, errors }
+}

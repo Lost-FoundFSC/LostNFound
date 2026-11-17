@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import ReportPage from './ReportPage';
 
 const submitButton = () => screen.getByRole('button', { name: /Submit report/i });
@@ -26,7 +26,20 @@ function mockFetch(status, body) {
   return fetchMock;
 }
 
+const photo = (name = 'iphone.jpg', type = 'image/jpeg', size = 1000) => {
+  const file = new File(['x'], name, { type });
+  Object.defineProperty(file, 'size', { value: size });
+  return file;
+};
+const photoInput = () => document.getElementById('report-photos-input');
+const addPhotos = (...files) => fireEvent.change(photoInput(), { target: { files } });
+
 describe('ReportPage', () => {
+  beforeEach(() => {
+    let count = 0;
+    URL.createObjectURL = vi.fn(() => `blob:preview-${++count}`);
+    URL.revokeObjectURL = vi.fn();
+  });
   afterEach(() => vi.unstubAllGlobals());
 
   it('renders the report form and submit button', () => {
@@ -60,9 +73,9 @@ describe('ReportPage', () => {
     set(/^Campus location/, '');
     fireEvent.click(submitButton());
     await waitFor(() => expect(onNavigate).toHaveBeenCalledWith('report-confirmation'));
-    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(sent.incidentDate).toBe('');
-    expect(sent.campusLocation).toBe('');
+    const sent = fetchMock.mock.calls[0][1].body;
+    expect(sent.get('incidentDate')).toBe('');
+    expect(sent.get('campusLocation')).toBe('');
   });
 
   it('explains the RAM ID format', () => {
@@ -129,8 +142,69 @@ describe('ReportPage', () => {
 
     await waitFor(() => expect(onNavigate).toHaveBeenCalledWith('report-confirmation'));
     expect(onSubmitted).toHaveBeenCalledWith(expect.objectContaining({ formId: 'L#591829326' }));
-    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(sent.studentId).toBe('R12345678');
-    expect(sent.phone).toBe('5165512685');
+    const sent = fetchMock.mock.calls[0][1].body;
+    expect(sent).toBeInstanceOf(FormData);
+    expect(sent.get('studentId')).toBe('R12345678');
+    expect(sent.get('phone')).toBe('5165512685');
+    expect(sent.get('liabilityAccepted')).toBe('true');
+    expect(sent.getAll('images')).toHaveLength(0);
+  });
+
+  it('has an upload photos button', () => {
+    render(<ReportPage />);
+    expect(screen.getByText('Upload photos')).toBeInTheDocument();
+    expect(photoInput()).toHaveAttribute('type', 'file');
+    expect(photoInput()).toHaveAttribute('multiple');
+    expect(screen.getByText('0 of 5 added')).toBeInTheDocument();
+  });
+
+  it('shows previews and lets photos be removed', () => {
+    render(<ReportPage />);
+    addPhotos(photo('front.jpg'), photo('back.png', 'image/png'));
+    expect(screen.getAllByRole('img', { name: /Selected photo/ })).toHaveLength(2);
+    expect(screen.getByText('2 of 5 added')).toBeInTheDocument();
+    expect(screen.getByText('Add more photos')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Remove photo 1: front.jpg/ }));
+    expect(screen.getAllByRole('img', { name: /Selected photo/ })).toHaveLength(1);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
+  });
+
+  it('rejects the wrong file type and photos over 5 MB', () => {
+    render(<ReportPage />);
+    addPhotos(photo('doc.pdf', 'application/pdf'), photo('huge.jpg', 'image/jpeg', 6 * 1024 * 1024), photo('ok.jpg'));
+    expect(screen.getByText(/doc.pdf: only JPEG, PNG, or WebP/)).toBeInTheDocument();
+    expect(screen.getByText(/huge.jpg: photo is larger than 5 MB/)).toBeInTheDocument();
+    expect(screen.getByText('1 of 5 added')).toBeInTheDocument();
+  });
+
+  it('allows at most 5 photos', () => {
+    render(<ReportPage />);
+    addPhotos(...Array.from({ length: 6 }, (_, i) => photo(`p${i}.jpg`)));
+    expect(screen.getByText('5 of 5 added')).toBeInTheDocument();
+    expect(screen.getByText(/You can add up to 5 photos/)).toBeInTheDocument();
+    expect(photoInput()).toBeDisabled();
+  });
+
+  it('sends the photos with the report', async () => {
+    const fetchMock = mockFetch(201, { formId: 'F#923356063', reportType: 'found', imageCount: 2 });
+    const onSubmitted = vi.fn();
+    render(<ReportPage onNavigate={vi.fn()} onSubmitted={onSubmitted} />);
+    fillValidForm();
+    addPhotos(photo('front.jpg'), photo('back.jpg'));
+    fireEvent.click(submitButton());
+    await waitFor(() => expect(onSubmitted).toHaveBeenCalled());
+    const images = fetchMock.mock.calls[0][1].body.getAll('images');
+    expect(images.map(file => file.name)).toEqual(['front.jpg', 'back.jpg']);
+    expect(fetchMock.mock.calls[0][1].headers).toBeUndefined();
+  });
+
+  it('shows photo errors from the backend', async () => {
+    mockFetch(400, { images: ['front.jpg: file is not a valid image.'] });
+    render(<ReportPage />);
+    fillValidForm();
+    addPhotos(photo('front.jpg'));
+    fireEvent.click(submitButton());
+    expect(await screen.findByText('front.jpg: file is not a valid image.')).toBeInTheDocument();
   });
 });

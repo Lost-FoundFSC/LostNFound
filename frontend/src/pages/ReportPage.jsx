@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { INITIAL_REPORT, REPORT_CATEGORIES, REPORT_FIELDS } from '../data/reportFields'
 import './ReportPage.css'
-import { validateReport } from '../utils/reportValidation'
+import { MAX_PHOTOS, PHOTO_TYPES, checkPhotos, validateReport } from '../utils/reportValidation'
 
 const CAMPUS_LOCATIONS = ['Campus Center', 'Greenley Library', 'Whitman Hall', 'Hale Hall', 'Lupton Hall', 'Nold Hall', 'Other / Unsure']
 const API_URL = 'http://localhost:8000/api/reports/'
@@ -13,6 +13,32 @@ function Field({ label, children, help, required, error, errorId, helpId }) {
     {help && <small id={helpId}>{help}</small>}
     {error && <span className="report-error" id={errorId} role="alert">{error}</span>}
   </label>
+}
+function PhotoPicker({ photos, onAdd, onRemove, error, reportType }) {
+  const hint = reportType === 'found'
+    ? 'A clear photo helps Campus Security match the item to its owner.'
+    : 'A photo of the item (or one like it) helps Campus Security recognize it.'
+  const full = photos.length >= MAX_PHOTOS
+  return <div className={`report-field report-photos ${error ? 'report-field--invalid' : ''}`}>
+    <span id="photos-label">Photos</span>
+    <small id="photos-help">Optional. {hint} Up to {MAX_PHOTOS} photos, JPEG, PNG, or WebP, 5 MB max each.</small>
+    {photos.length > 0 && <ul className="report-photo-list" aria-label="Selected photos">
+      {photos.map((photo, index) => <li key={photo.url} className="report-photo">
+        <img src={photo.url} alt={`Selected photo ${index + 1}: ${photo.file.name}`} />
+        <button type="button" className="report-photo-remove" onClick={() => onRemove(index)} aria-label={`Remove photo ${index + 1}: ${photo.file.name}`}>×</button>
+      </li>)}
+    </ul>}
+    <div className="report-photo-actions">
+      <input id="report-photos-input" className="report-photo-input" type="file" accept={PHOTO_TYPES.join(',')} multiple disabled={full}
+        aria-labelledby="photos-label" aria-describedby={['photos-help', error && 'photos-error'].filter(Boolean).join(' ')}
+        onChange={event => { onAdd(Array.from(event.target.files || [])); event.target.value = '' }} />
+      <label htmlFor="report-photos-input" className={`report-photo-button ${full ? 'report-photo-button--disabled' : ''}`} aria-hidden="true">
+        <span aria-hidden="true">📷</span> {photos.length ? 'Add more photos' : 'Upload photos'}
+      </label>
+      <span className="report-photo-count" aria-live="polite">{photos.length} of {MAX_PHOTOS} added</span>
+    </div>
+    {error && <span className="report-error" id="photos-error" role="alert">{error}</span>}
+  </div>
 }
 function Section({ title, subtitle, children }) {
   return <section className="report-section"><div className="report-section-title"><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><div className="report-section-body">{children}</div></section>
@@ -27,6 +53,25 @@ export default function ReportPage({ onNavigate, onSubmitted }) {
   const [serverErrors, setServerErrors] = useState({})   // field errors returned by the backend
   const [formMessage, setFormMessage] = useState('')     // problems not tied to one field
   const [sending, setSending] = useState(false)
+  const [photos, setPhotos] = useState([])               // [{ file, url }]
+  const [photoError, setPhotoError] = useState('')
+
+  // Free the preview images when the page closes.
+  const photosRef = useRef(photos)
+  useEffect(() => { photosRef.current = photos }, [photos])
+  useEffect(() => () => photosRef.current.forEach(photo => URL.revokeObjectURL(photo.url)), [])
+
+  function addPhotos(files) {
+    const { accepted, errors } = checkPhotos(files, photos.length)
+    setPhotos(previous => [...previous, ...accepted.map(file => ({ file, url: URL.createObjectURL(file) }))])
+    setPhotoError(errors.join(' '))
+  }
+
+  function removePhoto(index) {
+    URL.revokeObjectURL(photos[index].url)
+    setPhotos(previous => previous.filter((_, i) => i !== index))
+    setPhotoError('')
+  }
 
   const clientErrors = validateReport(values)
   const errorFor = name => serverErrors[name] || ((submitAttempted || touched[name]) ? clientErrors[name] : undefined)
@@ -77,11 +122,14 @@ export default function ReportPage({ onNavigate, onSubmitted }) {
 
     setSending(true)
     try {
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...values, studentId: values.studentId.trim().toUpperCase() }),
-      })
+      // Sent as form data so photos can go with the report.
+      // The browser sets the Content-Type header itself.
+      const body = new FormData()
+      for (const [key, value] of Object.entries({ ...values, studentId: values.studentId.trim().toUpperCase() })) {
+        body.append(key, typeof value === 'boolean' ? String(value) : value ?? '')
+      }
+      photos.forEach(photo => body.append('images', photo.file))
+      const response = await fetch(API_URL, { method: 'POST', body })
 
       if (response.ok) {
         // The backend replies with the new form ID, e.g. { formId: 'L#591829326', ... }
@@ -99,6 +147,7 @@ export default function ReportPage({ onNavigate, onSubmitted }) {
         for (const [key, messages] of Object.entries(body)) {
           const message = Array.isArray(messages) ? messages[0] : String(messages)
           if (key in REPORT_FIELDS) fieldErrors[key] = message
+          else if (key === 'images') setPhotoError((Array.isArray(messages) ? messages : [messages]).join(' '))
           else otherMessages.push(message)
         }
         setServerErrors(fieldErrors)
@@ -134,6 +183,7 @@ export default function ReportPage({ onNavigate, onSubmitted }) {
           <Field label="Item name" required {...fieldProps('itemName')}><input {...inputProps('itemName')} placeholder="e.g. Black umbrella, blue backpack" maxLength={120} required /></Field>
           <Field label="Description" required {...fieldProps('description')}><textarea {...inputProps('description')} rows={5} maxLength={1500} placeholder="Color, brand, distinctive marks, contents, etc." required /></Field>
           <Field label="Estimated value (USD)" {...fieldProps('estimatedValue')}><input {...inputProps('estimatedValue')} type="number" min="0" max="1000000" step="0.01" placeholder="Optional" /></Field>
+          <PhotoPicker photos={photos} onAdd={addPhotos} onRemove={removePhoto} error={photoError} reportType={values.reportType} />
         </Section>
       </div>
       <div className="report-column">

@@ -18,6 +18,11 @@ describe('ReportConfirmationPage', () => {
     expect(screen.getByText(/found item report was received/i)).toBeInTheDocument()
   })
 
+  it('mentions attached photos', () => {
+    render(<ReportConfirmationPage submission={{ formId: 'F#923356063', reportType: 'found', imageCount: 2 }} />)
+    expect(screen.getByText(/found item report with 2 photos was received/i)).toBeInTheDocument()
+  })
+
   it('falls back to the labeled sample preview without a submission', () => {
     render(<ReportConfirmationPage />)
     expect(screen.getByText('LF-2026-001847')).toBeInTheDocument()

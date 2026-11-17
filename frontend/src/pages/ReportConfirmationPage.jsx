@@ -12,6 +12,8 @@ export default function ReportConfirmationPage({ onNavigate, submission }) {
   const formId = submission?.formId
   const isReal = Boolean(formId)
   const typeLabel = submission?.reportType === 'found' ? 'found item' : 'lost item'
+  const photoCount = submission?.imageCount ?? 0
+  const photoNote = photoCount ? ` with ${photoCount} photo${photoCount === 1 ? '' : 's'}` : ''
 
   return (
     <section className="confirmation-page" aria-labelledby="confirmation-title">
@@ -35,7 +37,7 @@ export default function ReportConfirmationPage({ onNavigate, submission }) {
             {isReal ? (
               <>
                 <h2>Report submitted</h2>
-                <p>Your {typeLabel} report was received and saved.</p>
+                <p>Your {typeLabel} report{photoNote} was received and saved.</p>
               </>
             ) : (
               <>
