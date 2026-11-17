@@ -22,6 +22,7 @@ class ReportSerializer(serializers.ModelSerializer):
     studentId = serializers.CharField(
         source='student_id', max_length=20, required=False, allow_blank=True,
     )
+    phone = serializers.CharField(max_length=25)
     itemName = serializers.CharField(source='item_name', max_length=120)
     estimatedValue = serializers.DecimalField(
         source='estimated_value', max_digits=9, decimal_places=2,
@@ -93,6 +94,16 @@ class ReportSerializer(serializers.ModelSerializer):
                 {'mapLatitude': ['Send both mapLatitude and mapLongitude, or neither.']}
             )
         return attrs
+
+    def validate_phone(self, value):
+        digits = ''.join(ch for ch in value if ch.isdigit())
+        if len(digits) == 11 and digits.startswith('1'):
+            digits = digits[1:]
+        if len(digits) != 10:
+            raise serializers.ValidationError(
+                'Enter a 10-digit phone number, like (516) 555-1234.'
+            )
+        return f'({digits[:3]}) {digits[3:6]}-{digits[6:]}'
 
     def validate_studentId(self, value):
         ram_id = value.strip().upper()

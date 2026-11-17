@@ -28,6 +28,8 @@ function readPage() {
 export default function App() {
   const [activePage, setActivePage] = useState(readPage)
   const [menuOpen, setMenuOpen] = useState(() => window.innerWidth >= 800)
+  // Backend reply for the last submitted report ({ formId, reportType, ... }).
+  const [submittedReport, setSubmittedReport] = useState(null)
 
   useEffect(() => {
     function syncHash() { setActivePage(readPage()) }
@@ -53,9 +55,9 @@ export default function App() {
 ) : activePage === 'my-account' ? (
   <AccountPage onNavigate={navigate} />
 ) : activePage === 'forms' ? (
-  <ReportPage onNavigate={navigate} />
+  <ReportPage onNavigate={navigate} onSubmitted={setSubmittedReport} />
 ) : activePage === 'report-confirmation' ? (
-  <ReportConfirmationPage onNavigate={navigate} />
+  <ReportConfirmationPage onNavigate={navigate} submission={submittedReport} />
 
 ) : activePage === 'logout' ? (
   <LogoutPage onNavigate={navigate} />

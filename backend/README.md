@@ -155,6 +155,8 @@ Example response after submitting:
 The POST body uses the same camelCase field names as
 `frontend/src/data/reportFields.js`. Validation:
 
+- Name, email, and phone are required. The phone must have 10 digits
+  (a leading +1 is allowed) and is stored as (516) 555-1234.
 - The date cannot be in the future.
 - The liability notice must be accepted.
 - The category must be one of the form's categories.

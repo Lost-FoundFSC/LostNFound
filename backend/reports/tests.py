@@ -28,7 +28,7 @@ def payload(**overrides):
         'fullName': 'Jane Doe',
         'email': 'doej@farmingdale.edu',
         'studentId': 'R01234567',
-        'phone': '',
+        'phone': '516-555-1234',
         'category': 'Electronics',
         'itemName': 'Black AirPods case',
         'description': 'Scratch on lid',
@@ -154,6 +154,30 @@ class SubmitReportTests(TempMediaMixin, APITestCase):
         response = self.client.post(self.url, payload(studentId='12345'), format='json')
         self.assertEqual(response.status_code, 400)
         self.assertIn('studentId', response.data)
+
+    def test_phone_required(self):
+        for phone in ('', '   '):
+            response = self.client.post(self.url, payload(phone=phone), format='json')
+            self.assertEqual(response.status_code, 400, phone)
+            self.assertIn('phone', response.data)
+
+    def test_phone_must_be_10_digits(self):
+        response = self.client.post(self.url, payload(phone='555-1234'), format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('10-digit', str(response.data['phone']))
+
+    def test_phone_stored_in_one_format(self):
+        for raw in ('5165512685', '(516) 551-2685', '+1 516 551 2685'):
+            response = self.client.post(self.url, payload(phone=raw), format='json')
+            self.assertEqual(response.status_code, 201, raw)
+            report = LostReport.objects.get(form_id=response.data['formId'])
+            self.assertEqual(report.phone, '(516) 551-2685')
+
+    def test_name_and_email_required(self):
+        response = self.client.post(self.url, payload(fullName='', email=''), format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('fullName', response.data)
+        self.assertIn('email', response.data)
 
     def test_ram_id_optional(self):
         response = self.client.post(self.url, payload(studentId=''), format='json')
