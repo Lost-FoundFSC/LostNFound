@@ -16,12 +16,15 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
 
 from .views import health_check
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/health/', health_check, name='health-check'),
+    path('api/reports/', include('reports.urls')),
+    # Temporary browser login for testing the API until real sign-in exists.
+    path('api-auth/', include('rest_framework.urls')),
 ]
 
