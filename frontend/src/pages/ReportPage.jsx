@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { INITIAL_REPORT, REPORT_CATEGORIES, REPORT_FIELDS } from '../data/reportFields'
 import './ReportPage.css'
+import { isValidIncidentDate } from '../utils/reportValidation'
 
 const CAMPUS_LOCATIONS = ['Campus Center', 'Greenley Library', 'Whitman Hall', 'Hale Hall', 'Lupton Hall', 'Nold Hall', 'Other / Unsure']
 
@@ -18,31 +19,40 @@ const update = (name, value) => { setValues(previous => ({ ...previous, [name]: 
 }
   const inputProps = name => ({ name: REPORT_FIELDS[name], value: values[name], onChange: event => update(name, event.target.value) })
 
+
 async function submit(event) {
-event.preventDefault()
+  event.preventDefault();
 
-if (event.currentTarget.reportValidity()) {
-  try {
-    // Send the form data to Django backend 
-    const response = await fetch('http://localhost:8000/api/reports/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(values)
-    });
+  // Validate incident date before submitting
+  if (!isValidIncidentDate(values.incidentDate)) {
+    window.alert('Please enter a valid date that is not in the future.');
+    return;
+  }
 
-    if (response.ok) {
-      // If the backend successfully saves it, go to confirmation
-      onNavigate('report-confirmation');
-    } else {
-      alert('Failed to submit report. Please try again.');
+  // Submit the report to the Django backend
+  if (event.currentTarget.reportValidity()) {
+    try {
+      const response = await fetch('http://localhost:8000/api/reports/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(values),
+      });
+
+      if (response.ok) {
+        onNavigate('report-confirmation');
+      } else {
+        window.alert('Failed to submit report. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      window.alert('Unable to connect to the server. Please try again.');
     }
-  } catch (error) {
-    console.error('Error submitting report:', error);
   }
 }
-}
+
+
 
   return <div className="report-page">
     <header className="report-header"><div><p className="report-kicker">FSC LOST &amp; FOUND · FRONTEND DEMO</p><h1>Lost and Found Report</h1><p>Choose whether you are reporting a lost item or a found item, then provide as much information as possible.</p></div><div className="report-header-side"><span>○ No reports submitted</span><span className="report-user">JD &nbsp; Demo user</span></div></header>
@@ -87,4 +97,5 @@ if (event.currentTarget.reportValidity()) {
     </form>
     {onNavigate && <button type="button" className="report-back" onClick={() => onNavigate('my-account')}>← Back to My Account</button>}
   </div>
+
 }
