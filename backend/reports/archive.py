@@ -1,11 +1,12 @@
-"""Finding reports by form ID and moving them in and out of the archive."""
+"""Finding reports by form ID, matching lost and found reports, and moving
+reports in and out of the archive."""
 from django.db import transaction
 from django.utils import timezone
 
 from .models import (
     COPIED_FIELDS, DONE_STATUSES, OPEN_STATUSES, ArchivedReport,
     ArchivedReportImage, FoundReport, FoundReportImage, LostReport,
-    LostReportImage, ReportType, normalize_form_id, semester_for,
+    LostReportImage, ReportStatus, ReportType, normalize_form_id, semester_for,
 )
 
 OPEN_MODELS = {ReportType.LOST: LostReport, ReportType.FOUND: FoundReport}
@@ -73,11 +74,59 @@ def restore_report(archived, status):
     return report
 
 
-def change_status(report, status):
-    """Set a new status, archiving or restoring the report when needed.
+# ----------------------------------------------------------------- matching
 
-    Returns the report as it now exists (it may be a different object).
-    """
+class MatchError(ValueError):
+    """A lost/found match that is not allowed. The message is shown to the user."""
+
+
+def check_match(report, other_form_id):
+    """Validate a match without saving it. Returns the other report."""
+    other_id = normalize_form_id(other_form_id)
+    if other_id is None:
+        raise MatchError('Enter a form ID like L#123456789 or F#123456789.')
+    if other_id == report.form_id:
+        raise MatchError("A report can't be matched to itself.")
+    if other_id[0] == report.form_id[0]:
+        raise MatchError('A lost report can only be matched to a found report, and a found report to a lost one.')
+    other = find_report(other_id)
+    if other is None:
+        raise MatchError(f'There is no report with form ID {other_id}.')
+    if report.matched_form_id and report.matched_form_id != other.form_id:
+        raise MatchError(f'{report.form_id} is already matched to {report.matched_form_id}. Remove that match first.')
+    if other.matched_form_id and other.matched_form_id != report.form_id:
+        raise MatchError(f'{other.form_id} is already matched to {other.matched_form_id}.')
+    return other
+
+
+def _set_match(report, form_id):
+    report.matched_form_id = form_id
+    report.save(update_fields=['matched_form_id', 'updated_at'])
+
+
+@transaction.atomic
+def match_reports(report, other_form_id):
+    """Link a lost report and a found report so each stores the other's form ID."""
+    other = check_match(report, other_form_id)
+    _set_match(report, other.form_id)
+    _set_match(other, report.form_id)
+    return other
+
+
+@transaction.atomic
+def unmatch_report(report):
+    """Remove a match from both reports."""
+    if not report.matched_form_id:
+        return
+    other = find_report(report.matched_form_id)
+    if other is not None and other.matched_form_id == report.form_id:
+        _set_match(other, '')
+    _set_match(report, '')
+
+
+# ------------------------------------------------------------------ status
+
+def _apply_status(report, status):
     is_archived = isinstance(report, ArchivedReport)
     if status in DONE_STATUSES:
         if is_archived:
@@ -91,3 +140,27 @@ def change_status(report, status):
     report.status = status
     report.save(update_fields=['status', 'updated_at'])
     return report
+
+
+@transaction.atomic
+def change_status(report, status):
+    """Set a new status, archiving or restoring the report when needed.
+
+    Matched reports share their return: marking one Returned also marks its
+    match Returned (both move to the archive), and reopening a returned report
+    also reopens its returned match.
+
+    Returns the report as it now exists (it may be a different object).
+    """
+    was_returned = isinstance(report, ArchivedReport) and report.status == ReportStatus.RETURNED
+    partner = find_report(report.matched_form_id) if report.matched_form_id else None
+
+    updated = _apply_status(report, status)
+
+    if partner is not None:
+        if status == ReportStatus.RETURNED and partner.status != ReportStatus.RETURNED:
+            _apply_status(partner, ReportStatus.RETURNED)
+        elif (was_returned and status in OPEN_STATUSES
+              and isinstance(partner, ArchivedReport) and partner.status == ReportStatus.RETURNED):
+            _apply_status(partner, status)
+    return updated

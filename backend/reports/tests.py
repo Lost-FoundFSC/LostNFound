@@ -556,3 +556,182 @@ class SecurityAndArchiveTests(TempMediaMixin, UsersMixin, APITestCase):
         self.assertIsInstance(find_report(self.form_id), LostReport)
         self.set_status(self.form_id, 'returned')
         self.assertIsInstance(find_report(self.form_id), ArchivedReport)
+
+
+# ------------------------------------------------------ lost/found matches
+
+class MatchTests(TempMediaMixin, UsersMixin, APITestCase):
+    """A lost report and a found report for the same item point at each other."""
+
+    def setUp(self):
+        super().setUp()
+        self.make_users()
+        self.lost_id = self.submit([make_photo()], itemName='Sony headphones').data['formId']
+        self.found_id = self.submit([make_photo()], reportType='found', itemName='Sony headphones').data['formId']
+        self.client.force_authenticate(self.security)
+
+    def patch(self, form_id, **data):
+        return self.client.patch(reverse('report-detail', args=[form_id]), data, format='json')
+
+    def detail(self, form_id):
+        return self.client.get(reverse('report-detail', args=[form_id])).data
+
+    def test_match_links_both_reports(self):
+        response = self.patch(self.lost_id, matchedFormId=self.found_id)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['matchedFormId'], self.found_id)
+        self.assertEqual(self.detail(self.found_id)['matchedFormId'], self.lost_id)
+        # Both stay open until the item is returned.
+        self.assertEqual(LostReport.objects.count(), 1)
+        self.assertEqual(FoundReport.objects.count(), 1)
+
+    def test_match_accepts_id_without_hash_or_lowercase(self):
+        response = self.patch(self.found_id, matchedFormId=self.lost_id.replace('#', '').lower())
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['matchedFormId'], self.lost_id)
+
+    def test_returned_archives_both_with_each_others_id(self):
+        self.patch(self.lost_id, matchedFormId=self.found_id)
+        response = self.patch(self.found_id, status='returned')
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(LostReport.objects.count(), 0)
+        self.assertEqual(FoundReport.objects.count(), 0)
+        lost = ArchivedReport.objects.get(form_id=self.lost_id)
+        found = ArchivedReport.objects.get(form_id=self.found_id)
+        self.assertEqual((lost.status, lost.matched_form_id), ('returned', self.found_id))
+        self.assertEqual((found.status, found.matched_form_id), ('returned', self.lost_id))
+        self.assertEqual(lost.images.count(), 1)
+        self.assertEqual(found.images.count(), 1)
+
+    def test_match_and_return_in_one_request(self):
+        response = self.patch(self.lost_id, matchedFormId=self.found_id, status='returned')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['status'], 'returned')
+        self.assertEqual(response.data['matchedFormId'], self.found_id)
+        self.assertEqual(ArchivedReport.objects.count(), 2)
+
+    def test_other_stages_only_change_one_report(self):
+        self.patch(self.lost_id, matchedFormId=self.found_id)
+        self.patch(self.lost_id, status='ready_for_pickup')
+        self.assertEqual(LostReport.objects.get().status, 'ready_for_pickup')
+        self.assertEqual(FoundReport.objects.get().status, 'reported')
+
+    def test_closing_one_does_not_close_the_other(self):
+        self.patch(self.lost_id, matchedFormId=self.found_id)
+        self.patch(self.lost_id, status='closed')
+        self.assertEqual(ArchivedReport.objects.get().form_id, self.lost_id)
+        self.assertEqual(FoundReport.objects.get().matched_form_id, self.lost_id)
+
+    def test_reopening_a_returned_pair_reopens_both(self):
+        self.patch(self.lost_id, matchedFormId=self.found_id, status='returned')
+        response = self.patch(self.lost_id, status='under_verification')
+        self.assertEqual(response.data['status'], 'under_verification')
+        self.assertEqual(ArchivedReport.objects.count(), 0)
+        self.assertEqual(LostReport.objects.get().matched_form_id, self.found_id)
+        self.assertEqual(FoundReport.objects.get().status, 'under_verification')
+
+    def test_remove_match(self):
+        self.patch(self.lost_id, matchedFormId=self.found_id)
+        response = self.patch(self.found_id, matchedFormId='')
+        self.assertEqual(response.data['matchedFormId'], '')
+        self.assertEqual(LostReport.objects.get().matched_form_id, '')
+
+    def test_cannot_match_same_type(self):
+        other_lost = self.submit(itemName='Umbrella').data['formId']
+        self.client.force_authenticate(self.security)
+        response = self.patch(self.lost_id, matchedFormId=other_lost)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('found report', response.data['matchedFormId'][0])
+
+    def test_cannot_match_unknown_or_badly_typed_id(self):
+        self.assertIn('no report', self.patch(self.lost_id, matchedFormId='F#000000001').data['matchedFormId'][0])
+        self.assertIn('form ID like', self.patch(self.lost_id, matchedFormId='banana').data['matchedFormId'][0])
+
+    def test_cannot_match_to_itself(self):
+        response = self.patch(self.lost_id, matchedFormId=self.lost_id)
+        self.assertEqual(response.status_code, 400)
+
+    def test_cannot_steal_a_report_that_is_already_matched(self):
+        self.patch(self.lost_id, matchedFormId=self.found_id)
+        second_lost = self.submit(itemName='Headphones').data['formId']
+        self.client.force_authenticate(self.security)
+        response = self.patch(second_lost, matchedFormId=self.found_id)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('already matched', response.data['matchedFormId'][0])
+        self.assertEqual(FoundReport.objects.get().matched_form_id, self.lost_id)
+
+    def test_failed_match_does_not_change_status(self):
+        response = self.patch(self.lost_id, matchedFormId='F#000000001', status='returned')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(LostReport.objects.get().status, 'reported')
+
+    def test_patch_needs_status_or_match(self):
+        self.assertEqual(self.patch(self.lost_id).status_code, 400)
+
+    def test_students_cannot_match(self):
+        self.client.force_authenticate(self.student)
+        self.assertEqual(self.patch(self.lost_id, matchedFormId=self.found_id).status_code, 403)
+
+    def test_match_not_shown_in_public_progress(self):
+        self.patch(self.lost_id, matchedFormId=self.found_id)
+        self.client.force_authenticate(None)
+        data = self.client.get(reverse('report-progress', args=[self.lost_id])).data
+        self.assertNotIn('matchedFormId', data)
+
+
+class MatchAdminTests(TempMediaMixin, UsersMixin, TestCase):
+    """Matching from the Django admin."""
+
+    def setUp(self):
+        super().setUp()
+        from django.test import Client
+        self.api = APITestCase.client_class()
+        self.lost_id = self.api.post(reverse('report-submit'), payload(), format='json').data['formId']
+        self.found_id = self.api.post(reverse('report-submit'), payload(reportType='found'), format='json').data['formId']
+        admin_user = get_user_model().objects.create_superuser('admin', 'a@a.com', 'x')
+        self.client = Client()
+        self.client.force_login(admin_user)
+
+    def change_url(self, model, form_id):
+        name = model._meta.model_name
+        return reverse(f'admin:reports_{name}_change', args=[model.objects.get(form_id=form_id).pk])
+
+    def form_data(self, report, **overrides):
+        data = {
+            'matched_form_id': report.matched_form_id, 'full_name': report.full_name, 'email': report.email,
+            'student_id': report.student_id, 'phone': report.phone, 'category': report.category,
+            'item_name': report.item_name, 'description': report.description, 'estimated_value': '',
+            'incident_date': report.incident_date or '', 'incident_time': '', 'campus_location': report.campus_location,
+            'location_details': report.location_details, 'liability_accepted': 'on',
+            'map_latitude': '', 'map_longitude': '',
+            'images-TOTAL_FORMS': '0', 'images-INITIAL_FORMS': '0',
+            'images-MIN_NUM_FORMS': '0', 'images-MAX_NUM_FORMS': '1000',
+        }
+        data.update(overrides)
+        return data
+
+    def test_typing_a_match_in_the_admin_links_both(self):
+        lost = LostReport.objects.get()
+        response = self.client.post(self.change_url(LostReport, self.lost_id),
+                                    self.form_data(lost, matched_form_id=self.found_id.replace('#', '')))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(LostReport.objects.get().matched_form_id, self.found_id)
+        self.assertEqual(FoundReport.objects.get().matched_form_id, self.lost_id)
+
+    def test_invalid_match_shows_an_error(self):
+        lost = LostReport.objects.get()
+        response = self.client.post(self.change_url(LostReport, self.lost_id),
+                                    self.form_data(lost, matched_form_id='F#000000001'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'There is no report with form ID F#000000001.')
+        self.assertEqual(FoundReport.objects.get().matched_form_id, '')
+
+    def test_returned_action_archives_the_pair(self):
+        from .archive import match_reports
+        match_reports(LostReport.objects.get(), self.found_id)
+        response = self.client.post(reverse('admin:reports_lostreport_changelist'), {
+            'action': 'set_returned', '_selected_action': [LostReport.objects.get().pk]}, follow=True)
+        self.assertContains(response, f'Matched report(s) updated too: {self.found_id}')
+        self.assertEqual(ArchivedReport.objects.count(), 2)
+        self.assertEqual(ArchivedReport.objects.get(form_id=self.found_id).matched_form_id, self.lost_id)

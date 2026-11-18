@@ -143,7 +143,7 @@ when comparing reports.
 | GET | `/api/reports/found/` | Campus Security | Open found reports (same filter) |
 | GET | `/api/reports/archive/` | Campus Security | Archived reports (`?type=lost`, `?semester=Fall 2026`) |
 | GET | `/api/reports/<form ID>/` | Campus Security | Full report, open or archived |
-| PATCH | `/api/reports/<form ID>/` | Campus Security | Change status, for example `{"status": "ready_for_pickup"}` |
+| PATCH | `/api/reports/<form ID>/` | Campus Security | Change status, for example `{"status": "ready_for_pickup"}`, and/or match it, for example `{"matchedFormId": "F#238832420"}` |
 | GET | `/api/reports/<form ID>/images/<image_id>/` | Campus Security | View one photo |
 
 Example response after submitting:
@@ -205,6 +205,29 @@ rest of the report stays as submitted.
 
 The student dashboard endpoint (`/mine/`) needs real sign-in, which is
 not connected yet. It matches reports by the signed-in user's email.
+
+### Matching a lost report to a found report
+
+When Campus Security confirms that a lost report and a found report are the
+same item, they link the two. Each report then stores the other's form ID
+in `matchedFormId` (`matched_form_id` in the database).
+
+- API: `PATCH /api/reports/L384834901/` with
+  `{"matchedFormId": "F#238832420"}`. Send `""` to remove the match. A
+  status can be sent in the same request, for example
+  `{"matchedFormId": "F#238832420", "status": "returned"}`.
+- Admin: open either report, type the other form ID in **Matched form ID**,
+  and save. Clear the box to remove the match.
+
+Rules:
+
+- Only a lost report and a found report can be matched, one to one.
+- Marking either report **Returned** marks both returned and moves both to
+  the archive. In the archive each still shows the other's form ID.
+- Reopening a returned report reopens its returned match too.
+- Other status changes (possible match, ready for pickup, closed, and so
+  on) only change the one report.
+- The match is not shown in the public progress lookup.
 
 ### Photos
 

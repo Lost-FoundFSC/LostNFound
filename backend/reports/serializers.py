@@ -57,6 +57,7 @@ class ReportSerializer(serializers.ModelSerializer):
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     completedAt = serializers.DateTimeField(source='completed_at', read_only=True)
     archiveSemester = serializers.CharField(source='archive_semester', read_only=True)
+    matchedFormId = serializers.CharField(source='matched_form_id', read_only=True)
     images = serializers.SerializerMethodField()
 
     class Meta:
@@ -65,7 +66,7 @@ class ReportSerializer(serializers.ModelSerializer):
             'category', 'itemName', 'description', 'estimatedValue',
             'incidentDate', 'incidentTime', 'campusLocation', 'locationDetails',
             'mapLatitude', 'mapLongitude', 'liabilityAccepted', 'status', 'isActive', 'createdAt',
-            'completedAt', 'archiveSemester', 'images',
+            'completedAt', 'archiveSemester', 'matchedFormId', 'images',
         ]
 
     def to_internal_value(self, data):
@@ -178,6 +179,17 @@ class ProgressSerializer(serializers.Serializer):
 
 
 class StatusUpdateSerializer(serializers.Serializer):
-    """Used by Campus Security to move a report to its next stage."""
+    """Used by Campus Security to update a report.
 
-    status = serializers.ChoiceField(choices=ReportStatus.choices)
+    status:        move the report to another stage
+    matchedFormId: link this report to its lost/found match ('' removes the match)
+    At least one is required.
+    """
+
+    status = serializers.ChoiceField(choices=ReportStatus.choices, required=False)
+    matchedFormId = serializers.CharField(required=False, allow_blank=True, max_length=20)
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError('Send a status, a matchedFormId, or both.')
+        return attrs

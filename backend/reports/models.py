@@ -125,6 +125,16 @@ class ReportFields(models.Model):
     )
 
     liability_accepted = models.BooleanField(default=False)
+
+    # Form ID of the report on the other side of a confirmed match: a lost
+    # report's found report, or the other way around. Set by Campus Security.
+    # Both reports always point at each other, open or archived.
+    matched_form_id = models.CharField(
+        'Matched form ID', max_length=11, blank=True,
+        help_text='Form ID of the matching lost or found report, like F#123456789. '
+                  'Saving links both reports. Clear it to remove the match.',
+    )
+
     created_at = models.DateTimeField(default=timezone.now, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -142,7 +152,7 @@ COPIED_FIELDS = [
     'item_name', 'description', 'estimated_value', 'incident_date',
     'incident_time', 'campus_location', 'location_details',
     'map_latitude', 'map_longitude',
-    'liability_accepted', 'created_at',
+    'liability_accepted', 'matched_form_id', 'created_at',
 ]
 
 

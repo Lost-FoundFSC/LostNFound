@@ -7,7 +7,10 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from .archive import change_status, find_report, reports_for_email
+from .archive import (
+    MatchError, change_status, find_report, match_reports, reports_for_email,
+    unmatch_report,
+)
 from .images import MAX_IMAGES_PER_REPORT, ImageUploadError, clean_image
 from .models import (
     OPEN_STATUSES, ArchivedReport, FoundReport, FoundReportImage, LostReport,
@@ -155,6 +158,10 @@ class ReportDetail(APIView):
     GET   -> full report
     PATCH -> {"status": "<new status>"}. Returned/closed/cancelled moves the
              report to the archive; an open status moves it back.
+             {"matchedFormId": "F#123456789"} links a lost report and a found
+             report to each other ("" removes the link). When matched reports
+             are marked returned, both move to the archive together.
+             Both keys can be sent at once; the match is saved first.
     """
 
     permission_classes = [IsCampusSecurity]
@@ -172,7 +179,21 @@ class ReportDetail(APIView):
         report = self.get_report(form_id)
         serializer = StatusUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        report = change_status(report, serializer.validated_data['status'])
+        data = serializer.validated_data
+
+        with transaction.atomic():
+            if 'matchedFormId' in data:
+                try:
+                    if data['matchedFormId'].strip():
+                        match_reports(report, data['matchedFormId'])
+                    else:
+                        unmatch_report(report)
+                except MatchError as error:
+                    return Response({'matchedFormId': [str(error)]}, status=status.HTTP_400_BAD_REQUEST)
+                report = find_report(report.form_id)
+            if 'status' in data:
+                report = change_status(report, data['status'])
+
         report = find_report(report.form_id)  # reload with photos
         return Response(full_report_data(report, request))
 
