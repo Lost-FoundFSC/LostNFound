@@ -762,3 +762,118 @@ class MatchAdminTests(TempMediaMixin, UsersMixin, TestCase):
         self.assertContains(response, f'Matched report(s) updated too: {self.found_id}')
         self.assertEqual(ArchivedReport.objects.count(), 2)
         self.assertEqual(ArchivedReport.objects.get(form_id=self.found_id).matched_form_id, self.lost_id)
+# ---------------------------------------------------------- sample reports
+
+class SampleReportsCommandTests(TempMediaMixin, TestCase):
+    """python manage.py load_sample_reports"""
+
+    def run_command(self, *args):
+        from io import StringIO
+        from django.core.management import call_command
+        out = StringIO()
+        call_command('load_sample_reports', *args, stdout=out)
+        return out.getvalue()
+
+    def test_loads_open_reports_and_returned_pairs(self):
+        output = self.run_command()
+        # Still open: 6 lost reports nobody has found yet.
+        self.assertEqual(LostReport.objects.count(), 6)
+        self.assertEqual(FoundReport.objects.count(), 0)
+        self.assertEqual(LostReportImage.objects.count(), 11)
+        # 6 returned pairs (lost + found) in the archive, with the finders' photos.
+        self.assertEqual(ArchivedReport.objects.count(), 12)
+        self.assertEqual(ArchivedReport.objects.filter(status='returned').count(), 12)
+        self.assertEqual(ArchivedReportImage.objects.count(), 12)
+        self.assertIn('18 example report(s) created', output)
+        self.assertIn('6 pair(s) matched, 12 report(s) marked returned', output)
+
+    def test_returned_pairs_point_at_each_other(self):
+        self.run_command()
+        for lost in ArchivedReport.objects.filter(report_type='lost'):
+            found = ArchivedReport.objects.get(form_id=lost.matched_form_id)
+            self.assertEqual(found.report_type, 'found')
+            self.assertEqual(found.matched_form_id, lost.form_id)
+            # Different people filled in each side.
+            self.assertNotEqual(found.email, lost.email)
+            self.assertNotEqual(found.description, lost.description)
+            self.assertEqual(found.completed_at, lost.completed_at)
+
+    def test_sony_pair(self):
+        self.run_command()
+        found = ArchivedReport.objects.get(item_name='Sony WH-1000XM6 headphones')
+        lost = ArchivedReport.objects.get(form_id=found.matched_form_id)
+        self.assertEqual(lost.full_name, 'Ethan W Castillo')
+        self.assertEqual(found.full_name, 'Kevin R Okafor')
+        self.assertRegex(found.form_id, r'^F#\d{9}$')
+        self.assertRegex(lost.form_id, r'^L#\d{9}$')
+        self.assertEqual(found.student_id, 'R05502318')
+        self.assertEqual(found.phone, '(516) 555-0176')
+        self.assertEqual(found.created_at.date().isoformat(), '2026-11-12')
+        self.assertEqual(found.completed_at.date().isoformat(), '2026-11-14')
+        self.assertEqual(found.archive_semester, 'Fall 2026')
+        self.assertEqual(found.images.count(), 2)
+
+    def test_anonymous_finder_example(self):
+        self.run_command()
+        found = ArchivedReport.objects.get(item_name='Smartwatch with dark band')
+        self.assertEqual((found.full_name, found.email, found.phone), ('', '', ''))
+        self.assertEqual(ArchivedReport.objects.get(form_id=found.matched_form_id).full_name, 'Chloe A Bennett')
+
+    def test_backpack_pair_lists_contents(self):
+        self.run_command()
+        lost = ArchivedReport.objects.get(item_name='Herschel backpack')
+        found = ArchivedReport.objects.get(form_id=lost.matched_form_id)
+        self.assertEqual(found.item_name, 'Gray backpack')
+        for detail in ("BJ's water bottle", 'black binder', 'pens', 'AirTag'):
+            self.assertIn(detail, lost.description)
+            self.assertIn(detail, found.description)
+        self.assertEqual(found.images.count(), 2)
+
+    def test_report_with_blank_date_and_no_photos(self):
+        self.run_command()
+        wallet = LostReport.objects.get(item_name='Brown leather wallet')
+        self.assertIsNone(wallet.incident_date)
+        self.assertIsNone(wallet.estimated_value)
+        self.assertEqual(wallet.images.count(), 0)
+
+    def test_running_twice_does_not_duplicate(self):
+        self.run_command()
+        output = self.run_command()
+        total = LostReport.objects.count() + FoundReport.objects.count() + ArchivedReport.objects.count()
+        self.assertEqual(total, 18)
+        self.assertIn('0 example report(s) created, 18 already existed, 0 pair(s) matched, 0 report(s) marked returned', output)
+
+    def test_reopened_example_is_returned_again_on_next_run(self):
+        self.run_command()
+        from .archive import change_status
+        change_status(ArchivedReport.objects.get(item_name='Owala water bottle'), 'possible_match')
+        self.assertEqual(FoundReport.objects.count(), 1)
+        self.run_command()
+        self.assertEqual(FoundReport.objects.count(), 0)
+        self.assertEqual(ArchivedReport.objects.count(), 12)
+
+    def test_clear_reloads_with_new_form_ids(self):
+        self.run_command()
+        old_ids = set(LostReport.objects.values_list('form_id', flat=True))
+        self.run_command('--clear')
+        new_ids = set(LostReport.objects.values_list('form_id', flat=True))
+        self.assertEqual(len(new_ids), 6)
+        self.assertFalse(old_ids & new_ids)
+        self.assertEqual(ArchivedReport.objects.count(), 12)
+
+    def test_clear_leaves_real_reports_alone(self):
+        LostReport.objects.create(
+            full_name='Real Student', email='real1@farmingdale.edu', category='Books',
+            item_name='Calculus textbook', description='Blue cover', liability_accepted=True)
+        self.run_command()
+        self.run_command('--clear')
+        self.assertTrue(LostReport.objects.filter(item_name='Calculus textbook').exists())
+
+    def test_sample_photos_have_no_metadata(self):
+        from pathlib import Path
+        photo_dir = Path(__file__).resolve().parent / 'sample_data' / 'photos'
+        photos = sorted(photo_dir.glob('*.jpg'))
+        self.assertEqual(len(photos), 23)
+        for path in photos:
+            with Image.open(path) as image:
+                self.assertNotIn(0x8825, image.getexif(), path.name)  # no GPS

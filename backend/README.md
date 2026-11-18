@@ -286,6 +286,34 @@ In the admin site, security can search by form ID, name, email, or RAM
 ID, filter by status, and use the actions menu to move reports to the
 next stage, archive them, or reopen archived ones.
 
+### Example reports
+
+To fill your local database with example reports for testing or demos:
+
+```bash
+python manage.py load_sample_reports
+```
+
+This adds 18 example reports:
+
+- 6 open lost reports that nobody has found yet (4 with photos).
+- 6 returned items, each with two reports: a lost report from the owner
+  and a found report from the student who handed it in, with photos.
+  Each pair is matched and in the archive, pointing at each other. One
+  finder (the Apple Watch) left no contact details, which is allowed.
+
+It is safe to run more than once: reports that are already loaded are
+skipped. To remove the examples and load them again with new form IDs:
+
+```bash
+python manage.py load_sample_reports --clear
+```
+
+The examples are in `reports/sample_data/sample_reports.json` and their
+photos in `reports/sample_data/photos/`. Everyone in them is made up, and
+phone numbers use the 555-01xx range reserved for fiction. `--clear` only
+removes these examples, never real reports.
+
 ### Exporting reports
 
 To export reports as JSON files (for example, to feed to a matching model):
