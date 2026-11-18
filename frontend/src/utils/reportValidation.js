@@ -43,21 +43,31 @@ export const REPORT_ERRORS = Object.freeze({
 })
 
 /**
+ * Contact details are required on lost reports (Campus Security has to reach
+ * the owner) and optional on found reports (the finder has handed the item in).
+ */
+export function contactRequired(reportType) {
+  return reportType !== 'found'
+}
+
+/**
  * Checks the whole report form.
  * @returns {Object<string, string>} field name -> error message (empty when valid)
  */
 export function validateReport(values, today = new Date()) {
   const errors = {}
   const text = name => String(values[name] ?? '').trim()
+  const required = contactRequired(values.reportType)
 
-  if (!text('fullName')) errors.fullName = REPORT_ERRORS.fullName
+  // Contact fields: required for lost reports; if filled in, always checked.
+  if (required && !text('fullName')) errors.fullName = REPORT_ERRORS.fullName
 
-  if (!text('email')) errors.email = REPORT_ERRORS.emailRequired
+  if (!text('email')) { if (required) errors.email = REPORT_ERRORS.emailRequired }
   else if (!EMAIL.test(text('email'))) errors.email = REPORT_ERRORS.emailFormat
 
   if (text('studentId') && !RAM_ID.test(text('studentId'))) errors.studentId = REPORT_ERRORS.studentId
 
-  if (!text('phone')) errors.phone = REPORT_ERRORS.phoneRequired
+  if (!text('phone')) { if (required) errors.phone = REPORT_ERRORS.phoneRequired }
   else if (phoneDigits(values.phone).length !== 10) errors.phone = REPORT_ERRORS.phoneFormat
 
   if (!text('category')) errors.category = REPORT_ERRORS.category

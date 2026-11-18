@@ -179,6 +179,33 @@ class SubmitReportTests(TempMediaMixin, APITestCase):
         self.assertIn('fullName', response.data)
         self.assertIn('email', response.data)
 
+    def test_found_report_without_contact_info(self):
+        response = self.client.post(self.url, payload(
+            reportType='found', fullName='', email='', phone='', studentId=''), format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        report = FoundReport.objects.get()
+        self.assertEqual((report.full_name, report.email, report.phone), ('', '', ''))
+
+    def test_found_report_contact_fields_can_be_left_out(self):
+        data = payload(reportType='found')
+        for key in ('fullName', 'email', 'phone', 'studentId'):
+            del data[key]
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_found_report_contact_is_still_checked_when_given(self):
+        response = self.client.post(self.url, payload(
+            reportType='found', email='not-an-email', phone='555-1234'), format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('email', response.data)
+        self.assertIn('phone', response.data)
+
+    def test_lost_report_still_requires_contact_info(self):
+        response = self.client.post(self.url, payload(fullName='', email='', phone=''), format='json')
+        self.assertEqual(response.status_code, 400)
+        for field in ('fullName', 'email', 'phone'):
+            self.assertIn(field, response.data)
+
     def test_ram_id_optional(self):
         response = self.client.post(self.url, payload(studentId=''), format='json')
         self.assertEqual(response.status_code, 201)

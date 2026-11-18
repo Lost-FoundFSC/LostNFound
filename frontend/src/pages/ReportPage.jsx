@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { INITIAL_REPORT, REPORT_CATEGORIES, REPORT_FIELDS } from '../data/reportFields'
 import './ReportPage.css'
-import { MAX_PHOTOS, PHOTO_TYPES, checkPhotos, validateReport } from '../utils/reportValidation'
+import { MAX_PHOTOS, PHOTO_TYPES, checkPhotos, contactRequired, validateReport } from '../utils/reportValidation'
 
 const CAMPUS_LOCATIONS = ['Campus Center', 'Greenley Library', 'Whitman Hall', 'Hale Hall', 'Lupton Hall', 'Nold Hall', 'Other / Unsure']
 const API_URL = 'http://localhost:8000/api/reports/'
@@ -165,18 +165,23 @@ export default function ReportPage({ onNavigate, onSubmitted }) {
   }
 
   const liabilityError = errorFor('liabilityAccepted')
+  const needContact = contactRequired(values.reportType)
 
   return <div className="report-page">
     <header className="report-header"><div><p className="report-kicker">FSC LOST &amp; FOUND · FRONTEND DEMO</p><h1>Lost and Found Report</h1><p>Choose whether you are reporting a lost item or a found item, then provide as much information as possible. Fields marked <span className="report-required">*</span> are required.</p></div><div className="report-header-side"><span>○ No reports submitted</span><span className="report-user">JD &nbsp; Demo user</span></div></header>
     {formMessage && <div className="report-form-message" role="alert">{formMessage}</div>}
     <form ref={formRef} onSubmit={submit} className="report-grid" noValidate>
       <div className="report-column">
-        <Section title="Personal information" subtitle="How can we contact you about this item?">
-          <Field label="Name" required {...fieldProps('fullName')}><input {...inputProps('fullName')} placeholder="Enter your full name" maxLength={100} autoComplete="name" required /></Field>
-          <Field label="Email address" required {...fieldProps('email')}><input {...inputProps('email')} type="email" placeholder="you@farmingdale.edu" autoComplete="email" maxLength={150} required /></Field>
+        <Section title="Personal information" subtitle={needContact
+          ? 'How can we contact you about this item?'
+          : 'Optional for found items. Campus Security has the item, so everything needed is on this form.'}>
+          <Field label="Name" required={needContact} {...fieldProps('fullName')}><input {...inputProps('fullName')} placeholder={needContact ? 'Enter your full name' : 'Optional'} maxLength={100} autoComplete="name" required={needContact} /></Field>
+          <Field label="Email address" required={needContact} {...fieldProps('email')}><input {...inputProps('email')} type="email" placeholder={needContact ? 'you@farmingdale.edu' : 'Optional'} autoComplete="email" maxLength={150} required={needContact} /></Field>
           <Field label="Student ID (RAM ID)" help="Optional. The letter R followed by exactly 8 digits, like R01234567." helpId="studentId-help" {...fieldProps('studentId')}><input {...inputProps('studentId', 'studentId-help')} placeholder="R01234567" maxLength={12} autoComplete="off" /></Field>
-          <Field label="Phone" required help="10-digit phone number." helpId="phone-help" {...fieldProps('phone')}><input {...inputProps('phone', 'phone-help')} type="tel" placeholder="(516) 555-1234" autoComplete="tel" maxLength={25} required /></Field>
-          <div className="report-info">🔒 Your contact details and RAM ID are only shared with Campus Security so they can reach you about this item.</div>
+          <Field label="Phone" required={needContact} help={needContact ? '10-digit phone number.' : 'Optional. 10-digit phone number.'} helpId="phone-help" {...fieldProps('phone')}><input {...inputProps('phone', 'phone-help')} type="tel" placeholder="(516) 555-1234" autoComplete="tel" maxLength={25} required={needContact} /></Field>
+          <div className="report-info">{needContact
+            ? '🔒 Your contact details and RAM ID are only shared with Campus Security so they can reach you about this item.'
+            : '🔒 If you leave contact details, only Campus Security can see them. You can skip them if you have already handed the item in.'}</div>
         </Section>
         <Section title="Item details" subtitle="Give identifying details that can help match the item.">
           <Field label="Category" required {...fieldProps('category')}><select {...inputProps('category')} required><option value="">Select category</option>{REPORT_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}</select></Field>

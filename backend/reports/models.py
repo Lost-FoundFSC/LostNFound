@@ -9,12 +9,13 @@ from django.utils import timezone
 
 
 class Category(models.TextChoices):
-    ELECTRONICS = 'Electronics'
-    CLOTHING = 'Clothing'
-    ACCESSORIES = 'Accessories'
-    WALLETS_IDS = 'Wallets & IDs'
-    BOOKS = 'Books'
-    OTHER = 'Other'
+    # Value and label are the same, so the admin shows them exactly as the form does.
+    ELECTRONICS = 'Electronics', 'Electronics'
+    CLOTHING = 'Clothing', 'Clothing'
+    ACCESSORIES = 'Accessories', 'Accessories'
+    WALLETS_IDS = 'Wallets & IDs', 'Wallets & IDs'
+    BOOKS = 'Books', 'Books'
+    OTHER = 'Other', 'Other'
 
 
 class ReportType(models.TextChoices):
@@ -91,9 +92,11 @@ class ReportFields(models.Model):
 
     form_id = models.CharField(max_length=11, unique=True, editable=False)
 
-    # Contact
-    full_name = models.CharField(max_length=100)
-    email = models.EmailField(max_length=150)
+    # Contact. Required on lost reports (security has to reach the owner).
+    # Optional on found reports: the finder has handed the item in, so
+    # everything they know is already on the form.
+    full_name = models.CharField(max_length=100, blank=True)
+    email = models.EmailField(max_length=150, blank=True)
     student_id = models.CharField(max_length=9, blank=True)  # full RAM ID
     phone = models.CharField(max_length=25, blank=True)
 

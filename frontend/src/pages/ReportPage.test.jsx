@@ -56,6 +56,41 @@ describe('ReportPage', () => {
     expect(field(/^Student ID/)).not.toBeRequired();
   });
 
+  it('makes contact details optional on found reports', () => {
+    render(<ReportPage />);
+    set(/^Report type/, 'found');
+    for (const label of [/^Name/, /^Email address/, /^Phone/]) {
+      expect(field(label)).not.toBeRequired();
+      expect(field(label).closest('label')).not.toHaveTextContent('*');
+    }
+    expect(screen.getByText(/Optional for found items/)).toBeInTheDocument();
+  });
+
+  it('submits a found report without contact details', async () => {
+    const fetchMock = mockFetch(201, { formId: 'F#923356063', reportType: 'found' });
+    const onNavigate = vi.fn();
+    render(<ReportPage onNavigate={onNavigate} />);
+    set(/^Report type/, 'found');
+    set(/^Category/, 'Electronics');
+    set(/^Item name/, 'Black game controller');
+    set(/^Description/, 'Wavy line design');
+    fireEvent.click(field(/I acknowledge the notice above/));
+    fireEvent.click(submitButton());
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith('report-confirmation'));
+    const sent = fetchMock.mock.calls[0][1].body;
+    expect(sent.get('reportType')).toBe('found');
+    expect(sent.get('fullName')).toBe('');
+  });
+
+  it('still requires contact details on lost reports', () => {
+    render(<ReportPage />);
+    set(/^Report type/, 'found');
+    set(/^Report type/, 'lost');
+    fireEvent.click(submitButton());
+    expect(screen.getByText('Enter your name.')).toBeInTheDocument();
+    expect(field(/^Phone/)).toBeRequired();
+  });
+
   it('does not require the date or campus location', () => {
     render(<ReportPage />);
     expect(field(/^Date last seen/)).not.toBeRequired();

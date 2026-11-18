@@ -48,6 +48,17 @@ describe('validateReport', () => {
     expect(errors.phone).toBe(REPORT_ERRORS.phoneRequired)
   })
 
+  it('does not require contact details on found reports', () => {
+    const found = { ...valid, reportType: 'found', fullName: '', email: '', phone: '', studentId: '' }
+    expect(validateReport(found, today)).toEqual({})
+  })
+
+  it('still checks contact details on found reports when they are filled in', () => {
+    const errors = validateReport({ ...valid, reportType: 'found', email: 'nope', phone: '555-1234' }, today)
+    expect(errors.email).toBe(REPORT_ERRORS.emailFormat)
+    expect(errors.phone).toBe(REPORT_ERRORS.phoneFormat)
+  })
+
   it('rejects a RAM ID with the wrong number of digits', () => {
     expect(validateReport({ ...valid, studentId: 'R123456789' }, today).studentId).toBe(REPORT_ERRORS.studentId)
     expect(validateReport({ ...valid, studentId: 'R1234567' }, today).studentId).toBe(REPORT_ERRORS.studentId)

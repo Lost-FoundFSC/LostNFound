@@ -18,7 +18,10 @@ class ReportSerializer(serializers.ModelSerializer):
 
     formId = serializers.CharField(source='form_id', read_only=True)
     reportType = serializers.CharField(source='report_type', read_only=True)
+    # Contact details are required on lost reports. FoundReportSerializer
+    # makes them optional.
     fullName = serializers.CharField(source='full_name', max_length=100)
+    email = serializers.EmailField(max_length=150)
     studentId = serializers.CharField(
         source='student_id', max_length=20, required=False, allow_blank=True,
     )
@@ -101,6 +104,8 @@ class ReportSerializer(serializers.ModelSerializer):
         return attrs
 
     def validate_phone(self, value):
+        if not value.strip():
+            return ''  # only reachable when phone is optional (found reports)
         digits = ''.join(ch for ch in value if ch.isdigit())
         if len(digits) == 11 and digits.startswith('1'):
             digits = digits[1:]
@@ -135,6 +140,14 @@ class LostReportSerializer(ReportSerializer):
 
 
 class FoundReportSerializer(ReportSerializer):
+    """Found reports: the finder's name, email, and phone are optional,
+    because Campus Security already has the item. If given, they are still
+    checked (valid email, 10-digit phone)."""
+
+    fullName = serializers.CharField(source='full_name', max_length=100, required=False, allow_blank=True)
+    email = serializers.EmailField(max_length=150, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=25, required=False, allow_blank=True)
+
     class Meta(ReportSerializer.Meta):
         model = FoundReport
 

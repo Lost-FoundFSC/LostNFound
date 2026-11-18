@@ -155,8 +155,13 @@ Example response after submitting:
 The POST body uses the same camelCase field names as
 `frontend/src/data/reportFields.js`. Validation:
 
-- Name, email, and phone are required. The phone must have 10 digits
-  (a leading +1 is allowed) and is stored as (516) 555-1234.
+- Lost reports: name, email, and phone are required so Campus Security
+  can reach the owner.
+- Found reports: name, email, and phone are optional. The finder has
+  handed the item in, so everything needed is already on the form.
+- When contact details are given, they are checked: a valid email, and a
+  phone number with 10 digits (a leading +1 is allowed), stored as
+  (516) 555-1234.
 - The date (`incidentDate`) and campus location are optional, since
   people often only know roughly when or where. A date that is given
   cannot be in the future.
