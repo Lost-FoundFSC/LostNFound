@@ -8,6 +8,9 @@ __pycache__/
 # Local SQLite database
 db.sqlite3
 
+# Uploaded report photos
+media/
+
 # Environment variables and secrets
 .env
 .env.*

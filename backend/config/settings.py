@@ -38,9 +38,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'corsheaders',
+    'reports',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -117,7 +120,26 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Uploaded report photos. They are NOT served at a public URL; Campus
+# Security views them through /api/reports/<type>/<id>/images/<image_id>/.
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+REST_FRAMEWORK = {
+    # Limits how often one visitor can look up a form ID's progress.
+    'DEFAULT_THROTTLE_RATES': {
+        'report-progress': '30/minute',
+    },
+}
+
+# Allow the Vite dev server to call the API.
+# Override with a comma-separated list in .env for other origins.
+CORS_ALLOWED_ORIGINS = os.environ.get(
+    'CORS_ALLOWED_ORIGINS',
+    'http://localhost:5173,http://127.0.0.1:5173',
+).split(',')

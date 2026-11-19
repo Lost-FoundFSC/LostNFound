@@ -1,21 +1,29 @@
 import './ReportConfirmationPage.css'
 
 /**
- * Page 5 — report confirmation DESIGN PREVIEW.
- * No backend submission exists; never claim that a report was stored.
- * When an API is implemented, replace this preview with an authenticated,
- * server-confirmed receipt, including the server-issued report ID.
+ * Page 5 — report confirmation.
+ *
+ * `submission` is the backend's reply to POST /api/reports/, for example
+ * { formId: 'L#591829326', reportType: 'lost', status: 'reported' }.
+ * Without it (page opened directly or refreshed), the design preview with a
+ * clearly labeled sample ID is shown instead. Never show a sample ID as real.
  */
-export default function ReportConfirmationPage({ onNavigate }) {
+export default function ReportConfirmationPage({ onNavigate, submission }) {
+  const formId = submission?.formId
+  const isReal = Boolean(formId)
+  const typeLabel = submission?.reportType === 'found' ? 'found item' : 'lost item'
+  const photoCount = submission?.imageCount ?? 0
+  const photoNote = photoCount ? ` with ${photoCount} photo${photoCount === 1 ? '' : 's'}` : ''
+
   return (
     <section className="confirmation-page" aria-labelledby="confirmation-title">
       <header className="confirmation-page-heading">
         <div>
           <h1 id="confirmation-title">Lost and Found Report</h1>
-          <p>Submission confirmation — frontend preview</p>
+          <p>{isReal ? 'Submission confirmation' : 'Submission confirmation — frontend preview'}</p>
         </div>
-        <div className="confirmation-page-heading-actions" aria-label="Prototype status">
-          <span className="confirmation-notification">♧ &nbsp; No reports submitted</span>
+        <div className="confirmation-page-heading-actions" aria-label={isReal ? 'Submission status' : 'Prototype status'}>
+          <span className="confirmation-notification">♧ &nbsp; {isReal ? 'Report submitted' : 'No reports submitted'}</span>
           <span className="confirmation-demo-user"><span className="confirmation-avatar">JD</span> Demo user</span>
         </div>
       </header>
@@ -26,17 +34,38 @@ export default function ReportConfirmationPage({ onNavigate }) {
             <svg viewBox="0 0 32 32" width="34" height="34" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><path d="m6 17 7 7L27 9" /></svg>
           </div>
           <div className="confirmation-main-copy">
-            <h2>Report confirmation preview</h2>
-            <p>This is how the confirmation will appear after a successful report submission. No report has been submitted yet.</p>
+            {isReal ? (
+              <>
+                <h2>Report submitted</h2>
+                <p>Your {typeLabel} report{photoNote} was received and saved.</p>
+              </>
+            ) : (
+              <>
+                <h2>Report confirmation preview</h2>
+                <p>This is how the confirmation will appear after a successful report submission. No report has been submitted yet.</p>
+              </>
+            )}
           </div>
 
           <div className="confirmation-reference">
-            <div className="confirmation-reference-heading">
-              <span>Sample report ID</span>
-              <span className="confirmation-sample-pill">SAMPLE</span>
-            </div>
-            <strong>LF-2026-001847</strong>
-            <p>Example reference only. A real report ID will be assigned by the backend after submission.</p>
+            {isReal ? (
+              <>
+                <div className="confirmation-reference-heading">
+                  <span>Your form ID</span>
+                </div>
+                <strong data-testid="confirmation-form-id">{formId}</strong>
+                <p>Save this ID. You can use it to check the progress of your report.</p>
+              </>
+            ) : (
+              <>
+                <div className="confirmation-reference-heading">
+                  <span>Sample report ID</span>
+                  <span className="confirmation-sample-pill">SAMPLE</span>
+                </div>
+                <strong>LF-2026-001847</strong>
+                <p>Example reference only. A real report ID will be assigned by the backend after submission.</p>
+              </>
+            )}
           </div>
 
           <div className="confirmation-next">
@@ -45,7 +74,9 @@ export default function ReportConfirmationPage({ onNavigate }) {
             </div>
             <div>
               <h3>What happens next?</h3>
-              <p>After a real report is submitted, Campus Security will review its details and coordinate follow-up. Students will be able to track status updates from their account.</p>
+              <p>{isReal
+                ? 'Campus Security will review your report and coordinate follow-up. You can track status updates from your account.'
+                : 'After a real report is submitted, Campus Security will review its details and coordinate follow-up. Students will be able to track status updates from their account.'}</p>
             </div>
           </div>
 
@@ -54,7 +85,7 @@ export default function ReportConfirmationPage({ onNavigate }) {
             <button type="button" className="confirmation-button confirmation-button--secondary" onClick={() => onNavigate?.('forms')}>Submit another report</button>
           </div>
         </div>
-        <p className="confirmation-disclaimer">Design preview only. The sample report ID does not represent a real submission.</p>
+        {!isReal && <p className="confirmation-disclaimer">Design preview only. The sample report ID does not represent a real submission.</p>}
         <img className="confirmation-brand" src="/images/branding/fsc-lost-found-horizontal.png" alt="FSC Lost & Found" />
       </div>
     </section>
