@@ -61,15 +61,29 @@ Django automatically loads `.env` through `python-dotenv`.
 
 Never commit `.env` or share your secret key.
 
+### SQLite Database
+
+The backend uses SQLite by default. Django stores the database at:
+
+```text
+backend/db.sqlite3
+```
+
+This file is local development data and is ignored by Git. SQLite is suitable
+for development and testing. PostgreSQL may be used for a production deployment
+without changing the application models.
 
 ### Initialize and Run the Backend
 
-After configuring your `.env` file, run:
+After configuring your `.env` file, install the dependencies and initialize the SQLite database:
 
 ```bash
+python -m pip install -r requirements.txt
 python manage.py migrate
 python manage.py runserver
 ```
+
+Django creates the SQLite database and built-in tables through migrations.
 
 
 ## Health-check endpoint
@@ -93,18 +107,37 @@ Expected JSON response:
 python manage.py test
 ```
 
-The initial test verifies that the health-check endpoint returns
-HTTP 200 with the expected JSON response.
+The test suite verifies the health endpoint, account passwords, report
+ownership, claim ownership, and incident-date validation.
 
 ## Database
 
-SQLite is used for local development.
+The backend uses SQLite for local development and testing. Report data is
+stored in Django models in the `reports` app:
 
-Run `python manage.py migrate` to create the initial Django tables.
+- `Profile`: student or campus-security account details
+- `Report`: lost/found item submissions
+- `ReportAttachment`: report image or document uploads
+- `Match`: possible relationship between a lost report and found report
+- `Claim`: ownership claim associated with a report and claimant
 
-The local `db.sqlite3` file is excluded from Git.
+Usernames and passwords use Django's built-in authentication model. Passwords
+are hashed rather than stored as plain text.
 
-Lost and found report models will be added in a future development task.
+## API endpoints
+
+- `GET /api/session/`
+- `POST /api/auth/register/`
+- `POST /api/auth/login/`
+- `POST /api/auth/logout/`
+- `GET|POST /api/reports/`
+- `GET /api/claims/`
+- `POST /api/claims/create/`
+- `POST /api/attachments/upload/`
+- `GET /api/health/`
+
+The Django admin at `/admin/` provides staff review and report, match, and claim
+management.
 
 ## Security
 

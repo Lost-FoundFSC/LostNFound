@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { INITIAL_REPORT, REPORT_CATEGORIES, REPORT_FIELDS } from '../data/reportFields'
 import './ReportPage.css'
 import { isValidIncidentDate } from '../utils/reportValidation'
+import { apiPost, ensureSession } from '../utils/api'
 
 const CAMPUS_LOCATIONS = ['Campus Center', 'Greenley Library', 'Whitman Hall', 'Hale Hall', 'Lupton Hall', 'Nold Hall', 'Other / Unsure']
 
@@ -12,7 +13,7 @@ function Section({ title, subtitle, children }) {
   return <section className="report-section"><div className="report-section-title"><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><div className="report-section-body">{children}</div></section>
 }
 
-/** Page 4: UI prototype only. Never treat this form as a saved report. */
+/** Lost/found report submission page. */
 export default function ReportPage({ onNavigate }) {
   const [values, setValues] = useState(INITIAL_REPORT)
 const update = (name, value) => { setValues(previous => ({ ...previous, [name]: value  }))
@@ -32,22 +33,33 @@ async function submit(event) {
   // Submit the report to the Django backend
   if (event.currentTarget.reportValidity()) {
     try {
-      const response = await fetch('http://localhost:8000/api/reports/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(values),
-      });
-
-      if (response.ok) {
-        onNavigate('report-confirmation');
-      } else {
-        window.alert('Failed to submit report. Please try again.');
+      const session = await ensureSession()
+      if (!session.authenticated) {
+        window.alert('Please sign in before submitting a report.');
+        onNavigate('sign-in')
+        return
       }
+
+      await apiPost('/api/reports/', {
+        report_type: values.reportType,
+        full_name: values.fullName,
+        email: values.email,
+        student_id: values.studentId,
+        phone: values.phone,
+        category: values.category,
+        item_name: values.itemName,
+        description: values.description,
+        estimated_value: values.estimatedValue || null,
+        incident_date: values.incidentDate,
+        incident_time: values.incidentTime || null,
+        campus_location: values.campusLocation,
+        location_details: values.locationDetails,
+        liability_accepted: values.liabilityAccepted,
+      })
+      onNavigate('report-confirmation')
     } catch (error) {
       console.error('Error submitting report:', error);
-      window.alert('Unable to connect to the server. Please try again.');
+      window.alert(error.message || 'Unable to submit the report.');
     }
   }
 }

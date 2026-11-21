@@ -3,6 +3,7 @@ import Icon from '../components/Icon'
 import { AUTH_FIELD_NAMES, AUTH_ROLES } from '../data/fieldDefinitions'
 import { validateLoginId, validateSignIn } from '../auth/fscEmail'
 import './SignInPage.css'
+import { apiPost } from '../utils/api'
 
 /**
  * Page 2 — Sign In.
@@ -21,7 +22,7 @@ export default function SignInPage({ onNavigate }) {
   const [notice, setNotice] = useState('')
   const [errors, setErrors] = useState({})
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
     const result = validateSignIn({ loginId, password, role })
     setErrors(result.errors)
@@ -31,13 +32,18 @@ export default function SignInPage({ onNavigate }) {
       return
     }
 
-    setLoginId(result.loginId)
-    // Never keep the password in state longer than needed.
-    setPassword('')
-    const label = result.loginType === 'ramId' ? 'RAM ID' : 'FSC email'
-    setNotice(
-      `${result.loginId} is a valid ${label}. Authentication is not connected yet. Use Demo Account to preview the dashboard.`
-    )
+    try {
+      await apiPost('/api/auth/login/', {
+        login_id: result.loginId,
+        password,
+      })
+      setLoginId(result.loginId)
+      setPassword('')
+      onNavigate('my-account')
+    } catch (error) {
+      setNotice(error.message)
+      setPassword('')
+    }
   }
 
   function handleLoginIdBlur() {
