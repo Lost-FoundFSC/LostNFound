@@ -1,0 +1,244 @@
+
+[
+  {
+    "id": 1,
+    "lost_item": {
+      "name": "Apple AirPods Pro",
+      "category": "Electronics",
+      "color": "White",
+      "description": "AirPods Pro with a small scratch on the charging case"
+    },
+    "found_item": {
+      "name": "Apple AirPods Pro",
+      "category": "Electronics",
+      "color": "White",
+      "description": "White AirPods Pro with a scratch on the charging case"
+    },
+    "expected_match": true
+  },
+  {
+    "id": 2,
+    "lost_item": {
+      "name": "Nike Backpack",
+      "category": "Bags",
+      "color": "Black",
+      "description": "Black Nike backpack with a red zipper"
+    },
+    "found_item": {
+      "name": "Nike Backpack",
+      "category": "Bags",
+      "color": "Black",
+      "description": "Black Nike backpack with a red zipper"
+    },
+    "expected_match": true
+  },
+  {
+    "id": 3,
+    "lost_item": {
+      "name": "Samsung Galaxy S24",
+      "category": "Electronics",
+      "color": "Black",
+      "description": "Samsung phone with a cracked screen"
+    },
+    "found_item": {
+      "name": "iPhone 15",
+      "category": "Electronics",
+      "color": "Blue",
+      "description": "Blue iPhone with a clear case"
+    },
+    "expected_match": false
+  },
+  {
+    "id": 4,
+    "lost_item": {
+      "name": "Stanley Water Bottle",
+      "category": "Personal Items",
+      "color": "Pink",
+      "description": "Pink Stanley bottle with a flower sticker"
+    },
+    "found_item": {
+      "name": "Stanley Water Bottle",
+      "category": "Personal Items",
+      "color": "Pink",
+      "description": "Pink Stanley bottle with a flower sticker"
+    },
+    "expected_match": true
+  },
+  {
+    "id": 5,
+    "lost_item": {
+      "name": "Dell Laptop Charger",
+      "category": "Electronics",
+      "color": "Black",
+      "description": "Dell charger with a blue connector tip"
+    },
+    "found_item": {
+      "name": "HP Laptop Charger",
+      "category": "Electronics",
+      "color": "Black",
+      "description": "HP charger with a blue connector tip"
+    },
+    "expected_match": false
+  },
+  {
+  "id": 6,
+  "lost_item": {
+    "name": "Adidas Hoodie",
+    "category": "Clothing",
+    "color": "Gray",
+    "description": "Gray Adidas hoodie with a small coffee stain on the sleeve"
+  },
+  "found_item": {
+    "name": "Adidas Hoodie",
+    "category": "Clothing",
+    "color": "Gray",
+    "description": "Gray Adidas hoodie with a coffee stain on the sleeve"
+  },
+  "expected_match": true
+},
+{
+  "id": 7,
+  "lost_item": {
+    "name": "Casio Watch",
+    "category": "Accessories",
+    "color": "Silver",
+    "description": "Silver Casio watch with a scratched face"
+  },
+  "found_item": {
+    "name": "Casio Watch",
+    "category": "Accessories",
+    "color": "Gold",
+    "description": "Gold Casio watch with a clean face"
+  },
+  "expected_match": false
+},
+{
+  "id": 8,
+  "lost_item": {
+    "name": "Blue Notebook",
+    "category": "School Supplies",
+    "color": "Blue",
+    "description": "Blue spiral notebook with a math sticker"
+  },
+  "found_item": {
+    "name": "Blue Notebook",
+    "category": "School Supplies",
+    "color": "Blue",
+    "description": "Blue spiral notebook with a math sticker"
+  },
+  "expected_match": true
+},
+{
+  "id": 9,
+  "lost_item": {
+    "name": "Apple MacBook Air",
+    "category": "Electronics",
+    "color": "Silver",
+    "description": "Silver MacBook Air with a star sticker"
+  },
+  "found_item": {
+    "name": "Apple MacBook Pro",
+    "category": "Electronics",
+    "color": "Space Gray",
+    "description": "MacBook Pro with no stickers"
+  },
+  "expected_match": false
+},
+{
+  "id": 10,
+  "lost_item": {
+    "name": "Black Umbrella",
+    "category": "Accessories",
+    "color": "Black",
+    "description": "Black umbrella with a wooden handle"
+  },
+  "found_item": {
+    "name": "Black Umbrella",
+    "category": "Accessories",
+    "color": "Black",
+    "description": "Black umbrella with a wooden handle"
+  },
+  "expected_match": true
+},
+{
+  "id": 11,
+  "lost_item": {
+    "name": "Sony Headphones",
+    "category": "Electronics",
+    "color": "Black",
+    "description": "Sony headphones with a broken left ear cushion"
+  },
+  "found_item": {
+    "name": "Sony Headphones",
+    "category": "Electronics",
+    "color": "Black",
+    "description": "Sony headphones with a broken left ear cushion"
+  },
+  "expected_match": true
+},
+{
+  "id": 12,
+  "lost_item": {
+    "name": "Nike Sneakers",
+    "category": "Shoes",
+    "color": "White",
+    "description": "White Nike sneakers with blue laces"
+  },
+  "found_item": {
+    "name": "Adidas Sneakers",
+    "category": "Shoes",
+    "color": "White",
+    "description": "White Adidas sneakers with black laces"
+  },
+  "expected_match": false
+},
+{
+  "id": 13,
+  "lost_item": {
+    "name": "Student ID Card",
+    "category": "Personal Items",
+    "color": "Green",
+    "description": "Student ID card with a cracked plastic holder"
+  },
+  "found_item": {
+    "name": "Student ID Card",
+    "category": "Personal Items",
+    "color": "Green",
+    "description": "Student ID card with a cracked plastic holder"
+  },
+  "expected_match": true
+},
+{
+  "id": 14,
+  "lost_item": {
+    "name": "Hydro Flask Bottle",
+    "category": "Personal Items",
+    "color": "Purple",
+    "description": "Purple Hydro Flask with a dent on the bottom"
+  },
+  "found_item": {
+    "name": "Hydro Flask Bottle",
+    "category": "Personal Items",
+    "color": "Purple",
+    "description": "Purple Hydro Flask with no dents"
+  },
+  "expected_match": false
+},
+{
+  "id": 15,
+  "lost_item": {
+    "name": "Car Keys",
+    "category": "Accessories",
+    "color": "Black",
+    "description": "Toyota car key with a red keychain"
+  },
+  "found_item": {
+    "name": "Car Keys",
+    "category": "Accessories",
+    "color": "Black",
+    "description": "Toyota car key with a red keychain"
+  },
+  "expected_match": true
+}
+
+]
