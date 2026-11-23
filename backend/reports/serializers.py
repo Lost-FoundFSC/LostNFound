@@ -191,6 +191,20 @@ class ProgressSerializer(serializers.Serializer):
         return STATUS_LABELS.get(report.status, report.status)
 
 
+class PotentialMatchSerializer(serializers.ModelSerializer):
+    """Public item details used to compare a lost report with found reports."""
+
+    formId = serializers.CharField(source='form_id')
+    itemName = serializers.CharField(source='item_name')
+    campusLocation = serializers.CharField(source='campus_location')
+    incidentDate = serializers.DateField(source='incident_date', allow_null=True)
+    matchScore = serializers.IntegerField(source='match_score')
+
+    class Meta:
+        model = FoundReport
+        fields = ['formId', 'itemName', 'category', 'campusLocation', 'incidentDate', 'matchScore']
+
+
 class StatusUpdateSerializer(serializers.Serializer):
     """Used by Campus Security to update a report.
 

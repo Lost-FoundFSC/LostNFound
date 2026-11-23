@@ -27,6 +27,7 @@ urlpatterns = [
     path('', views.submit_report, name='report-submit'),
     path('mine/', views.my_reports, name='my-reports'),
     path('progress/<form_id:form_id>/', views.ReportProgress.as_view(), name='report-progress'),
+    path('<form_id:form_id>/matches/', views.PotentialMatches.as_view(), name='potential-matches'),
     # Campus Security
     path('lost/', views.LostReportList.as_view(), name='lost-report-list'),
     path('found/', views.FoundReportList.as_view(), name='found-report-list'),

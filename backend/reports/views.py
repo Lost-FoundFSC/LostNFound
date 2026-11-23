@@ -16,10 +16,12 @@ from .models import (
     OPEN_STATUSES, ArchivedReport, FoundReport, FoundReportImage, LostReport,
     LostReportImage, ReportType,
 )
+from .matching import calculate_match_score
 from .permissions import IsCampusSecurity
 from .serializers import (
     ArchivedReportSerializer, FoundReportSerializer, LostReportSerializer,
-    ProgressSerializer, StatusUpdateSerializer, full_report_data,
+    PotentialMatchSerializer, ProgressSerializer, StatusUpdateSerializer,
+    full_report_data,
 )
 
 SERIALIZERS = {ReportType.LOST: LostReportSerializer, ReportType.FOUND: FoundReportSerializer}
@@ -93,6 +95,36 @@ class ReportProgress(APIView):
         if report is None:
             raise Http404
         return Response(ProgressSerializer(report).data)
+
+
+class PotentialMatches(APIView):
+    """Return limited, ranked found-report details for one lost report."""
+
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'potential-matches'
+
+    def get(self, request, form_id):
+        lost_report = LostReport.objects.filter(form_id=form_id).first()
+        if lost_report is None:
+            raise Http404
+
+        candidates = []
+        found_reports = FoundReport.objects.filter(matched_form_id='').order_by('-created_at')
+        for found_report in found_reports:
+            found_report.match_score = calculate_match_score(lost_report, found_report)
+            if found_report.match_score > 0:
+                candidates.append(found_report)
+        candidates.sort(key=lambda report: report.match_score, reverse=True)
+
+        return Response({
+            'lostReport': {
+                'formId': lost_report.form_id,
+                'itemName': lost_report.item_name,
+                'category': lost_report.category,
+            },
+            'matches': PotentialMatchSerializer(candidates, many=True).data,
+        })
 
 
 @api_view(['GET'])

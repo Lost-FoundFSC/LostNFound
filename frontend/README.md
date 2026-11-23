@@ -9,7 +9,7 @@ The application provides a responsive interface for students and staff to naviga
 - Animated, collapsible navigation sidebar
 - FSC Lost & Found branding and logos
 - Forms and Sign In navigation
-- Demo possible-matches review with sample lost/found report details
+- Possible-match lookup for lost reports in the current browser session
 - Reusable React components and CSS styles
 - Placeholder pages for features under development
 
@@ -69,7 +69,7 @@ http://localhost:5173/
 
 The FSC Lost & Found homepage should now appear in your browser.
 
-The **Possible Matches (Demo)** view displays fixture data only. Its short-answer security check compares responses locally against sample details; responses are not saved or sent anywhere, and the check does not verify ownership. Because this is a frontend-only demo, its sample answer keys are not secure and can be inspected in the source/bundle. A production verification flow must keep private answer keys on the server and use staff review. It does not run AI matching, connect to a backend, or represent real item reports.
+The **Possible Matches** view automatically loads results for lost reports submitted in the current browser session. Form IDs are kept in `sessionStorage` so they survive page refreshes in that tab; they are not linked to a signed-in account. The view displays ranked found reports and a comparison score based on item name, category, date, and location; this score is not a probability or ownership decision. The endpoint omits contact details, descriptions, and photos. The development default API is `http://localhost:8000/api/reports/`, matching the report form; configure Django CORS to permit the Vite origin.
 
 ### 6. Stop the Server
 

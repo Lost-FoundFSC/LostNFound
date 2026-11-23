@@ -8,7 +8,7 @@ import './ReportConfirmationPage.css'
  * Without it (page opened directly or refreshed), the design preview with a
  * clearly labeled sample ID is shown instead. Never show a sample ID as real.
  */
-export default function ReportConfirmationPage({ onNavigate, submission }) {
+export default function ReportConfirmationPage({ onNavigate, onViewMatches, submission }) {
   const formId = submission?.formId
   const isReal = Boolean(formId)
   const typeLabel = submission?.reportType === 'found' ? 'found item' : 'lost item'
@@ -81,6 +81,7 @@ export default function ReportConfirmationPage({ onNavigate, submission }) {
           </div>
 
           <div className="confirmation-actions">
+            {isReal && submission?.reportType === 'lost' && <button type="button" className="confirmation-button confirmation-button--primary" onClick={() => onViewMatches?.(formId)}>View potential matches</button>}
             <button type="button" className="confirmation-button confirmation-button--primary" onClick={() => onNavigate?.('home')}>Return to home</button>
             <button type="button" className="confirmation-button confirmation-button--secondary" onClick={() => onNavigate?.('forms')}>Submit another report</button>
           </div>

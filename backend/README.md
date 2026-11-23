@@ -138,6 +138,7 @@ when comparing reports.
 |---|---|---|---|
 | POST | `/api/reports/` | Anyone | Submit the report form. Returns the form ID. |
 | GET | `/api/reports/progress/<form ID>/` | Anyone with the form ID | Progress of one report (no personal details). Limited to 30 lookups a minute. |
+| GET | `/api/reports/<lost form ID>/matches/` | Anyone with the lost form ID | All ranked, unlinked found reports with nonzero comparison scores and limited public item details. Limited to 20 lookups a minute. |
 | GET | `/api/reports/mine/` | Signed-in student | Progress of every report submitted with the student's email (open and archived), for the dashboard |
 | GET | `/api/reports/lost/` | Campus Security | Open lost reports (`?status=possible_match` to filter) |
 | GET | `/api/reports/found/` | Campus Security | Open found reports (same filter) |
@@ -233,6 +234,112 @@ Rules:
 - Other status changes (possible match, ready for pickup, closed, and so
   on) only change the one report.
 - The match is not shown in the public progress lookup.
+
+### Potential matches for a lost report
+
+The React Possible Matches page requests
+`GET /api/reports/L384834901/matches/` using the lost report's form ID.
+The response contains the lost item's name and category plus all matching
+unlinked found reports with their form ID, item name, category, location,
+date, and a `matchScore` from 0 to 100. Contact details, descriptions, and
+photos are not returned. The endpoint is public and rate-limited; treat the
+lost report form ID as private.
+
+The score is a heuristic comparison of item-name similarity, category,
+location, and date when available. It is not an AI result or a calibrated
+probability of ownership. Campus Security must verify a match.
+
+#### Sample data for testing
+
+Run `python manage.py seed_sample_reports` after migrations to add eight
+synthetic reports to the local database. The command uses stable form IDs,
+skips reports that already exist, and refuses to run unless `DEBUG=True`.
+It does not delete or update existing reports. The API tests also build
+reports from a shared sample form in `reports/tests.py`; the separate
+matching evaluation dataset in `reports/ai_evaluation/golden_tests.json`
+contains the 15 sample lost/found pairs below. Its `expected_match` value
+is the evaluation label, not a result produced by the live percentage
+matcher.
+
+On Windows, run the command from the `backend` directory with:
+
+```powershell
+py manage.py seed_sample_reports
+```
+
+| # | Lost-item sample (name; category; color; description) | Found-item sample (name; category; color; description) | Expected match |
+|---:|---|---|:---:|
+| 1 | Apple AirPods Pro; Electronics; White; AirPods Pro with a small scratch on the charging case | Apple AirPods Pro; Electronics; White; White AirPods Pro with a scratch on the charging case | Yes |
+| 2 | Nike Backpack; Bags; Black; Black Nike backpack with a red zipper | Nike Backpack; Bags; Black; Black Nike backpack with a red zipper | Yes |
+| 3 | Samsung Galaxy S24; Electronics; Black; Samsung phone with a cracked screen | iPhone 15; Electronics; Blue; Blue iPhone with a clear case | No |
+| 4 | Stanley Water Bottle; Personal Items; Pink; Pink Stanley bottle with a flower sticker | Stanley Water Bottle; Personal Items; Pink; Pink Stanley bottle with a flower sticker | Yes |
+| 5 | Dell Laptop Charger; Electronics; Black; Dell charger with a blue connector tip | HP Laptop Charger; Electronics; Black; HP charger with a blue connector tip | No |
+| 6 | Adidas Hoodie; Clothing; Gray; Gray Adidas hoodie with a small coffee stain on the sleeve | Adidas Hoodie; Clothing; Gray; Gray Adidas hoodie with a coffee stain on the sleeve | Yes |
+| 7 | Casio Watch; Accessories; Silver; Silver Casio watch with a scratched face | Casio Watch; Accessories; Gold; Gold Casio watch with a clean face | No |
+| 8 | Blue Notebook; School Supplies; Blue; Blue spiral notebook with a math sticker | Blue Notebook; School Supplies; Blue; Blue spiral notebook with a math sticker | Yes |
+| 9 | Apple MacBook Air; Electronics; Silver; Silver MacBook Air with a star sticker | Apple MacBook Pro; Electronics; Space Gray; MacBook Pro with no stickers | No |
+| 10 | Black Umbrella; Accessories; Black; Black umbrella with a wooden handle | Black Umbrella; Accessories; Black; Black umbrella with a wooden handle | Yes |
+| 11 | Sony Headphones; Electronics; Black; Sony headphones with a broken left ear cushion | Sony Headphones; Electronics; Black; Sony headphones with a broken left ear cushion | Yes |
+| 12 | Nike Sneakers; Shoes; White; White Nike sneakers with blue laces | Adidas Sneakers; Shoes; White; White Adidas sneakers with black laces | No |
+| 13 | Student ID Card; Personal Items; Green; Student ID card with a cracked plastic holder | Student ID Card; Personal Items; Green; Student ID card with a cracked plastic holder | Yes |
+| 14 | Hydro Flask Bottle; Personal Items; Purple; Purple Hydro Flask with a dent on the bottom | Hydro Flask Bottle; Personal Items; Purple; Purple Hydro Flask with no dents | No |
+| 15 | Car Keys; Accessories; Black; Toyota car key with a red keychain | Car Keys; Accessories; Black; Toyota car key with a red keychain | Yes |
+
+These are evaluation examples, not all valid submissions to `POST
+/api/reports/`: the live API categories are `Electronics`, `Clothing`,
+`Accessories`, `Wallets & IDs`, `Books`, and `Other`. In particular,
+`Bags`, `Personal Items`, `School Supplies`, and `Shoes` in the evaluation
+dataset are not accepted API category values. The evaluation fixtures also
+use `color`, while the report API has no separate color field.
+
+The seed command creates these eight reports. Form IDs are fixed by the
+command so every developer can test the same IDs:
+
+| Form ID | Type | Category | Item and unique identifying detail |
+|---|---|---|---|
+| `L#312198494` | Lost | Electronics | Navy Sony headphones with a silver star sticker on the left ear cup and initials MK under the headband. |
+| `F#471000254` | Found | Accessories | Brass dorm key with a scratched round head and an orange rocket-shaped keychain. |
+| `L#142196003` | Lost | Clothing | Charcoal canvas backpack with a turquoise dinosaur patch and a missing zipper pull on the left side. |
+| `F#889760940` | Found | Clothing | Olive carry-on duffel with a white ram-shaped patch on the side handle and a red luggage tag. |
+| `L#800000001` | Lost | Books | Calculus textbook with a red bicycle sticker on the back cover and pages 42-48 highlighted in green. |
+| `F#800000001` | Found | Books | Calculus textbook with a red bicycle sticker and green highlighting on pages 42-48. |
+| `L#800000002` | Lost | Wallets & IDs | Brown leather card wallet with a tiny brass compass charm stitched beside the inside ID window. |
+| `F#800000002` | Found | Wallets & IDs | Brown leather card wallet with a small brass compass charm next to the clear ID window. |
+
+The lost reports use synthetic `example.com` email addresses and `555-0101`
+through `555-0104` phone numbers. The key is categorized as `Accessories`;
+bags and carry-ons use `Clothing`. These are local-only test records, not
+production reports.
+
+To create additional test reports through the API, submit valid report
+forms. This example follows the shared base payload in `reports/tests.py`;
+change `reportType` to `found` to create a found report (contact fields are
+optional for found reports). The API assigns the form ID in its response:
+
+```json
+{
+  "reportType": "lost",
+  "fullName": "Jane Doe",
+  "email": "doej@farmingdale.edu",
+  "studentId": "R01234567",
+  "phone": "516-555-1234",
+  "category": "Electronics",
+  "itemName": "Black AirPods case",
+  "description": "Scratch on lid",
+  "estimatedValue": "",
+  "incidentDate": "",
+  "incidentTime": "",
+  "campusLocation": "Greenley Library",
+  "locationDetails": "2nd floor",
+  "liabilityAccepted": true
+}
+```
+
+Submit one lost report and one or more found reports with `POST
+/api/reports/`, then request `GET /api/reports/<lost form ID>/matches/`
+using the lost report ID returned by the API. The live matcher compares
+item name, category, location, and date; it does not use description or a
+separate color value.
 
 ### Photos
 

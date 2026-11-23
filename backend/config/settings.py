@@ -135,6 +135,7 @@ REST_FRAMEWORK = {
     # Limits how often one visitor can look up a form ID's progress.
     'DEFAULT_THROTTLE_RATES': {
         'report-progress': '30/minute',
+        'potential-matches': '20/minute',
     },
 }
 

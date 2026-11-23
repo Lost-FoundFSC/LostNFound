@@ -12,6 +12,7 @@ import ReportPage from './pages/ReportPage'
 import ReportConfirmationPage from './pages/ReportConfirmationPage'
 import LogoutPage from './pages/LogoutPage'
 import PossibleMatchesPage from './pages/PossibleMatchesPage'
+import { addLostReportId, readLostReportIds } from './utils/sessionReports'
 
 const knownPages = new Set([
   ...NAV_ITEMS.map(item => item.key),
@@ -19,7 +20,6 @@ const knownPages = new Set([
   'logout',
   'possible-matches',
 ])
-
 function readPage() {
   const candidate = window.location.hash.replace(/^#\/?/, '')
   return knownPages.has(candidate) ? candidate : 'home'
@@ -30,6 +30,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(() => window.innerWidth >= 800)
   // Backend reply for the last submitted report ({ formId, reportType, ... }).
   const [submittedReport, setSubmittedReport] = useState(null)
+  const [lostReportFormIds, setLostReportFormIds] = useState(readLostReportIds)
 
   useEffect(() => {
     function syncHash() { setActivePage(readPage()) }
@@ -44,6 +45,17 @@ export default function App() {
     if (window.innerWidth < 800) setMenuOpen(false)
   }
 
+  function recordSubmission(submission) {
+    setSubmittedReport(submission)
+    if (submission?.reportType !== 'lost') return
+
+    setLostReportFormIds(addLostReportId(lostReportFormIds, submission.formId))
+  }
+
+  function viewPotentialMatches() {
+    navigate('possible-matches')
+  }
+
   return <div className={`app-shell ${menuOpen ? 'app-shell--sidebar-open' : ''}`}>
     <Sidebar open={menuOpen} onNavigate={navigate} activePage={activePage} onClose={() => setMenuOpen(false)} />
     <main className="main-area">
@@ -55,14 +67,14 @@ export default function App() {
 ) : activePage === 'my-account' ? (
   <AccountPage onNavigate={navigate} />
 ) : activePage === 'forms' ? (
-  <ReportPage onNavigate={navigate} onSubmitted={setSubmittedReport} />
+  <ReportPage onNavigate={navigate} onSubmitted={recordSubmission} />
 ) : activePage === 'report-confirmation' ? (
-  <ReportConfirmationPage onNavigate={navigate} submission={submittedReport} />
+  <ReportConfirmationPage onNavigate={navigate} onViewMatches={viewPotentialMatches} submission={submittedReport} />
 
 ) : activePage === 'logout' ? (
   <LogoutPage onNavigate={navigate} />
 ) : activePage === 'possible-matches' ? (
-  <PossibleMatchesPage onNavigate={navigate} />
+  <PossibleMatchesPage onNavigate={navigate} lostReportFormIds={lostReportFormIds} />
 ) : (
   <PlaceholderPage page={activePage} onNavigate={navigate} />
 )}

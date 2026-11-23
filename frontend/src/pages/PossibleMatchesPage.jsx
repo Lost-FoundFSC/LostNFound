@@ -1,126 +1,151 @@
-import { useState } from 'react'
-import { DEMO_REPORTS } from '../data/accountDemoData'
+import { useEffect, useRef, useState } from 'react'
 import './PossibleMatchesPage.css'
 
-const reportsWithMatches = DEMO_REPORTS.filter(report => report.possibleMatches.length > 0)
-const prettyDate = date => new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-const normalizeAnswer = answer => answer.trim().toLocaleLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ')
+const API_URL = 'http://localhost:8000/api/reports/'
+const prettyDate = date => date
+  ? new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  : 'Not specified'
 
-function MatchQuestionnaire({ match }) {
-  const [answers, setAnswers] = useState({})
-  const [result, setResult] = useState(null)
-
-  function submitQuestionnaire(event) {
-    event.preventDefault()
-    const matchedAnswers = match.securityCheck.filter(question =>
-      normalizeAnswer(answers[question.id] || '') === normalizeAnswer(question.answer)
-    ).length
-    setResult({ matchedAnswers, total: match.securityCheck.length })
-  }
-
-  function resetQuestionnaire() {
-    setAnswers({})
-    setResult(null)
-  }
-
-  return (
-    <section className="match-questionnaire" aria-labelledby={`questionnaire-${match.id}`}>
-      <div className="match-questionnaire-heading">
-        <div>
-          <h3 id={`questionnaire-${match.id}`}>Private item verification</h3>
-          <p>Enter details only the owner is likely to know. Identifying answers are not shown in the item listing.</p>
-        </div>
-        {result === null
-          ? <span className="questionnaire-progress">{Object.keys(answers).length} of {match.securityCheck.length} answered</span>
-          : <button type="button" className="questionnaire-reset" onClick={resetQuestionnaire}>Try again</button>}
-      </div>
-
-      {result === null ? (
-        <form className="questionnaire-form" onSubmit={submitQuestionnaire}>
-          {match.securityCheck.map((question, index) => (
-            <label className="questionnaire-field" key={question.id}>
-              <span><strong>{index + 1}.</strong> {question.prompt}</span>
-              <input
-                required
-                type="text"
-                maxLength={200}
-                autoComplete="off"
-                value={answers[question.id] ?? ''}
-                onChange={event => setAnswers(current => ({ ...current, [question.id]: event.target.value }))}
-                placeholder="Enter the detail you remember"
-              />
-            </label>
-          ))}
-          <button type="submit" className="questionnaire-submit">Submit answers</button>
-        </form>
-      ) : (
-        <div className={`questionnaire-result ${result.matchedAnswers >= 3 ? 'questionnaire-result--likely' : ''}`} role="status">
-          <strong>{result.matchedAnswers} of {result.total} details matched the private sample answers.</strong>
-          <p>{result.matchedAnswers >= 3
-            ? 'The answers support this possible match. Continue to staff review; this result alone does not establish ownership.'
-            : 'There is not enough matching detail to support this possible match. Check what you entered or contact staff.'}</p>
-          <p>This is a local demo comparison, not an AI decision or ownership verification. A real check must be performed securely by a backend and reviewed by staff.</p>
-        </div>
-      )}
-      <p className="questionnaire-disclaimer">Demo only: answers are checked in this page, not saved or sent anywhere. Production verification must keep answer keys private on the server.</p>
-    </section>
-  )
+function normalizeFormId(formId) {
+  if (typeof formId !== 'string' || !/^L#?\d{9}$/i.test(formId.trim())) return null
+  return formId.trim().toUpperCase().replace('#', '')
 }
 
-export default function PossibleMatchesPage({ onNavigate }) {
+async function fetchMatchData(formId, signal) {
+  const response = await fetch(`${API_URL}${formId}/matches/`, { signal })
+  let data
+  try {
+    data = await response.json()
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error('The server returned an unreadable response.', { cause: error })
+    }
+    throw error
+  }
+
+  if (response.status === 404) {
+    throw new Error('A lost report from this browser session could not be found.')
+  }
+  if (response.status === 429) {
+    throw new Error('Too many match lookups. Please wait a minute and try again.')
+  }
+  if (!response.ok) {
+    throw new Error(data.detail || 'Unable to load possible matches. Please try again.')
+  }
+  if (!data.lostReport || !Array.isArray(data.matches)) {
+    throw new Error('The server returned an unexpected matches response.')
+  }
+  return data
+}
+
+function messageForError(error) {
+  return error instanceof TypeError
+    ? 'Unable to connect to the server. Check your connection and try again.'
+    : error.message || 'Unable to load possible matches. Please try again.'
+}
+
+export default function PossibleMatchesPage({ onNavigate, lostReportFormIds = [] }) {
+  const [reports, setReports] = useState([])
+  const [loading, setLoading] = useState(() => lostReportFormIds.some(id => normalizeFormId(id)))
+  const [errorMessage, setErrorMessage] = useState('')
+  const requestController = useRef(null)
+
+  useEffect(() => {
+    const formIds = [...new Set(lostReportFormIds.map(normalizeFormId).filter(Boolean))]
+    if (!formIds.length) return undefined
+
+    const controller = new AbortController()
+    requestController.current = controller
+    Promise.allSettled(formIds.map(formId => fetchMatchData(formId, controller.signal)))
+      .then(outcomes => {
+        if (controller.signal.aborted) return
+
+        const loadedReports = outcomes
+          .filter(outcome => outcome.status === 'fulfilled')
+          .map(outcome => outcome.value)
+        const failedCount = outcomes.length - loadedReports.length
+        setReports(loadedReports)
+
+        if (failedCount === outcomes.length) {
+          const firstFailure = outcomes.find(outcome => outcome.status === 'rejected')
+          setErrorMessage(messageForError(firstFailure.reason))
+        } else if (failedCount > 0) {
+          setErrorMessage(`Matches for ${failedCount} of your lost reports could not be loaded. Please try again.`)
+        }
+      })
+      .finally(() => {
+        if (requestController.current === controller) {
+          requestController.current = null
+          setLoading(false)
+        }
+      })
+
+    return () => controller.abort()
+  }, [lostReportFormIds])
+
   return (
     <section className="matches-page page-card" aria-labelledby="matches-title">
       <header className="matches-page-header">
         <div>
-          <p className="matches-demo-label">DEMO DATA — SAMPLE MATCHES</p>
+          <p className="matches-kicker">LOST &amp; FOUND</p>
           <h1 id="matches-title">Possible Matches</h1>
-          <p>Review found-item reports that may correspond to your lost-item reports.</p>
+          <p>Found items that may match your lost-item reports.</p>
         </div>
-        <button className="matches-back-button" type="button" onClick={() => onNavigate('my-account')}>Back to My Account</button>
+        <button className="matches-back-button" type="button" onClick={() => onNavigate?.('my-account')}>Back to My Account</button>
       </header>
 
-      <p className="matches-notice">These examples are manually written demo data. No AI analysis or real report search has been performed, and these reports are not stored or sent to a server.</p>
+      <p className="matches-session-notice">
+        Showing matches for lost reports saved in this browser session. They are not yet linked to a signed-in account.
+      </p>
 
-      {reportsWithMatches.length ? reportsWithMatches.map(report => report.possibleMatches.map(match => (
-        <article className="match-card" key={`${report.id}-${match.id}`}>
-          <header className="match-card-header">
-            <div>
-              <span className="match-reference">Match for report {report.id}</span>
-              <h2>{report.title}</h2>
-            </div>
-            <div className="match-score" aria-label={`${match.matchScore}% sample match score`}>
-              <strong>{match.matchScore}%</strong>
-              <span>sample score</span>
-            </div>
-          </header>
+      {loading && <p className="matches-loading" role="status">Loading possible matches…</p>}
+      {errorMessage && <p className="matches-error" role="alert">{errorMessage}</p>}
 
-          <div className="match-comparison">
-            <section className="match-item">
-              <p className="match-item-label">Your lost-item report</p>
-              <h3>{report.title}</h3>
-              <dl>
-                <div><dt>Category</dt><dd>{report.category}</dd></div>
-                <div><dt>Last seen</dt><dd>{report.location} · {prettyDate(report.reportedAt)}</dd></div>
-                <div><dt>Description</dt><dd>{report.description}</dd></div>
-              </dl>
+      {!lostReportFormIds.some(id => normalizeFormId(id)) && (
+        <div className="matches-no-reports">
+          <p>No lost-item reports are linked to this browser session yet.</p>
+          <button type="button" onClick={() => onNavigate?.('forms')}>Submit a lost-item report</button>
+        </div>
+      )}
+
+      {reports.length > 0 && (
+        <div className="matches-results">
+          <p className="matches-score-notice">
+            Scores compare item name, category, location, and date when available. They are not probabilities
+            or proof that an item belongs to you; Campus Security must verify any match.
+          </p>
+          {reports.map(report => (
+            <section className="matches-report-group" key={report.lostReport.formId} aria-labelledby={`lost-report-${report.lostReport.formId.replace('#', '')}`}>
+              <header className="matches-lost-item">
+                <p className="match-item-label">Possible matches for your lost report</p>
+                <h2 id={`lost-report-${report.lostReport.formId.replace('#', '')}`}>{report.lostReport.itemName}</h2>
+                <p>{report.lostReport.category} · Report {report.lostReport.formId}</p>
+              </header>
+
+              {report.matches.length ? report.matches.map(match => (
+                <article className="match-card" key={match.formId}>
+                  <header className="match-card-header">
+                    <div>
+                      <span className="match-reference">Found report {match.formId}</span>
+                      <h3>{match.itemName}</h3>
+                    </div>
+                    <div className="match-score" aria-label={`${match.matchScore}% comparison score`}>
+                      <strong>{match.matchScore}%</strong>
+                      <span>match score</span>
+                    </div>
+                  </header>
+                  <dl className="match-details">
+                    <div><dt>Category</dt><dd>{match.category}</dd></div>
+                    <div><dt>Found</dt><dd>{match.campusLocation || 'Location not specified'} · {prettyDate(match.incidentDate)}</dd></div>
+                  </dl>
+                </article>
+              )) : <p className="matches-empty">There are no unlinked found reports for this lost item yet.</p>}
             </section>
-            <section className="match-item match-item--found">
-              <p className="match-item-label">Sample found-item report</p>
-              <h3>{match.item.title}</h3>
-              <dl>
-                <div><dt>Category</dt><dd>{match.item.category}</dd></div>
-                <div><dt>Found</dt><dd>{match.item.location} · {prettyDate(match.item.reportedAt)}</dd></div>
-                <div><dt>Description</dt><dd>Identifying details are withheld for private verification.</dd></div>
-              </dl>
-            </section>
-          </div>
+          ))}
+        </div>
+      )}
 
-          <p className="match-explanation">{match.explanation}</p>
-          {match.securityCheck?.length > 0 && <MatchQuestionnaire key={match.id} match={match} />}
-        </article>
-      ))) : <p className="matches-empty">There are no sample matches to review.</p>}
-
-      <p className="matches-footer">A real match review requires backend report data and staff verification before an item can be claimed or returned.</p>
+      <p className="matches-footer">Found-item contact details, descriptions, and photos are kept private. Ask Campus Security to verify a potential match.</p>
     </section>
   )
 }
