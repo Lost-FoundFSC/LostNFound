@@ -2,11 +2,13 @@ import re
 import shutil
 import tempfile
 from datetime import timedelta
-from io import BytesIO
+from io import BytesIO, StringIO
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.cache import cache
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -41,6 +43,32 @@ def payload(**overrides):
     }
     data.update(overrides)
     return data
+
+
+class SeedSampleReportsCommandTests(TestCase):
+
+    @override_settings(DEBUG=True)
+    def test_command_seeds_eight_reports_and_is_idempotent(self):
+        first_output = StringIO()
+        call_command('seed_sample_reports', stdout=first_output)
+        self.assertIn('Created 8 sample reports; skipped 0', first_output.getvalue())
+        self.assertEqual(LostReport.objects.count(), 4)
+        self.assertEqual(FoundReport.objects.count(), 4)
+        self.assertEqual(
+            set(LostReport.objects.values_list('form_id', flat=True)),
+            {'L#312198494', 'L#142196003', 'L#800000001', 'L#800000002'},
+        )
+
+        second_output = StringIO()
+        call_command('seed_sample_reports', stdout=second_output)
+        self.assertIn('Created 0 sample reports; skipped 8', second_output.getvalue())
+        self.assertEqual(LostReport.objects.count(), 4)
+        self.assertEqual(FoundReport.objects.count(), 4)
+
+    @override_settings(DEBUG=False)
+    def test_command_refuses_to_seed_when_debug_is_disabled(self):
+        with self.assertRaises(CommandError):
+            call_command('seed_sample_reports', stdout=StringIO())
 
 
 def form_payload(**overrides):
@@ -430,6 +458,101 @@ class ProgressTests(TempMediaMixin, UsersMixin, APITestCase):
         finally:
             ScopedRateThrottle.THROTTLE_RATES = original
         self.assertEqual(codes[-1], 429)
+
+
+# --------------------------------------------------- potential matches (public)
+
+class PotentialMatchesTests(TempMediaMixin, UsersMixin, APITestCase):
+
+    def setUp(self):
+        super().setUp()
+        self.make_users()
+        self.lost_id = self.submit(
+            itemName='Black AirPods case',
+            incidentDate='2026-10-18',
+            campusLocation='Greenley Library',
+        ).data['formId']
+
+    def matches(self, form_id):
+        return self.client.get(reverse('potential-matches', args=[form_id]))
+
+    def test_returns_ranked_candidates_and_comparison_scores(self):
+        close_match = self.submit(
+            reportType='found',
+            itemName='AirPods case black',
+            incidentDate='2026-10-19',
+            campusLocation='Greenley Library',
+        ).data['formId']
+        weaker_match = self.submit(
+            reportType='found',
+            itemName='AirPods case with scratches',
+            incidentDate='2026-10-25',
+            campusLocation='Whitman Hall',
+        ).data['formId']
+
+        response = self.matches(self.lost_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['lostReport']['formId'], self.lost_id)
+        self.assertEqual(response.data['matches'][0]['formId'], close_match)
+        self.assertGreater(response.data['matches'][0]['matchScore'], response.data['matches'][1]['matchScore'])
+        self.assertEqual(response.data['matches'][1]['formId'], weaker_match)
+
+    def test_does_not_return_candidates_with_no_matching_attributes(self):
+        self.submit(
+            reportType='found',
+            itemName='Red backpack',
+            category='Clothing',
+            incidentDate='2026-08-01',
+            campusLocation='Whitman Hall',
+        )
+
+        self.assertEqual(self.matches(self.lost_id).data['matches'], [])
+
+    def test_returns_all_matching_candidates(self):
+        for index in range(21):
+            self.submit(
+                reportType='found',
+                itemName=f'Black item {index}',
+                category='Electronics',
+            )
+
+        self.assertEqual(len(self.matches(self.lost_id).data['matches']), 21)
+
+    def test_does_not_expose_private_report_details(self):
+        self.submit(
+            reportType='found',
+            fullName='Finder Name',
+            email='finder@farmingdale.edu',
+            studentId='R12345678',
+            description='Secret identifying detail',
+        )
+
+        response = self.matches(self.lost_id)
+        candidate = response.data['matches'][0]
+
+        for hidden in ('fullName', 'email', 'studentId', 'phone', 'description', 'images'):
+            self.assertNotIn(hidden, candidate)
+        self.assertNotIn('description', response.data['lostReport'])
+
+    def test_only_lost_reports_can_request_matches(self):
+        found_id = self.submit(reportType='found').data['formId']
+        self.assertEqual(self.matches(found_id).status_code, 404)
+        self.assertEqual(self.matches('L#000000001').status_code, 404)
+
+    def test_excludes_already_linked_found_reports(self):
+        found_id = self.submit(reportType='found').data['formId']
+        self.client.force_authenticate(self.security)
+        self.client.patch(
+            reverse('report-detail', args=[self.lost_id]),
+            {'matchedFormId': found_id},
+            format='json',
+        )
+
+        response = self.matches(self.lost_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['matches'], [])
 
 
 # ------------------------------------------------------- student dashboard

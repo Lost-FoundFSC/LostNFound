@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
-import { render, screen } from '@testing-library/react'
-import { describe, it, expect } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
 import ReportConfirmationPage from './ReportConfirmationPage'
 
 describe('ReportConfirmationPage', () => {
@@ -16,6 +16,17 @@ describe('ReportConfirmationPage', () => {
   it('says found item for found reports', () => {
     render(<ReportConfirmationPage submission={{ formId: 'F#923356063', reportType: 'found' }} />)
     expect(screen.getByText(/found item report was received/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'View potential matches' })).not.toBeInTheDocument()
+  })
+
+  it('lets a lost-item reporter open their potential matches', () => {
+    const onViewMatches = vi.fn()
+    render(<ReportConfirmationPage
+      submission={{ formId: 'L#591829326', reportType: 'lost' }}
+      onViewMatches={onViewMatches}
+    />)
+    fireEvent.click(screen.getByRole('button', { name: 'View potential matches' }))
+    expect(onViewMatches).toHaveBeenCalledWith('L#591829326')
   })
 
   it('mentions attached photos', () => {
