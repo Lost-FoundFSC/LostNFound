@@ -26,5 +26,6 @@ urlpatterns = [
     path('api/reports/', include('reports.urls')),
     # Temporary browser login for testing the API until real sign-in exists.
     path('api-auth/', include('rest_framework.urls')),
+    path('api/', include('matching.urls')),
 ]
 
