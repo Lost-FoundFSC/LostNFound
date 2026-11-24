@@ -18,7 +18,7 @@ from .prompts import PROMPT_VERSION, SYSTEM_PROMPT, build_user_message
 
 log = logging.getLogger(__name__)
 
-MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-5")
+MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
 MAX_CANDIDATES = 15     # never send more than this many found reports to Claude
 TIMEOUT_SECONDS = 10
 MIN_SCORE_TO_SHOW = 30  # hide very weak matches
@@ -26,17 +26,34 @@ MIN_SCORE_TO_SHOW = 30  # hide very weak matches
 
 def _call_claude(lost, found_items):
     """Ask Claude. Returns its raw text. Raises an exception on any problem."""
+    import anthropic
+
     api_key = os.environ.get("ANTHROPIC_API_KEY")
+
     if not api_key or api_key.startswith("paste-your"):
         raise RuntimeError("ANTHROPIC_API_KEY is not set")
-    import anthropic  # imported here so tests/CI work without the package
-    client = anthropic.Anthropic(api_key=api_key, timeout=TIMEOUT_SECONDS)
+
+    workspace_id = os.environ.get("ANTHROPIC_WORKSPACE_ID")
+
+    client = anthropic.Anthropic(
+        api_key=api_key,
+        timeout=TIMEOUT_SECONDS,
+        default_headers=(
+            {"anthropic-workspace-id": workspace_id}
+            if workspace_id else {}
+        ),
+    )
+
     response = client.messages.create(
         model=MODEL,
         max_tokens=1024,
-        temperature=0,  # makes results more consistent run to run
         system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": build_user_message(lost, found_items)}],
+        messages=[
+            {
+                "role": "user",
+                "content": build_user_message(lost, found_items),
+            }
+        ],
     )
     return response.content[0].text
 
