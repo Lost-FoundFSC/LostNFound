@@ -139,6 +139,39 @@ def my_reports(request):
 
 # --------------------------------------------------------- Campus Security
 
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def public_report_search(request):
+    """Return limited, non-contact report details for public browsing."""
+    results = []
+
+    for report_type, model in (
+        ('lost', LostReport),
+        ('found', FoundReport),
+    ):
+        reports = model.objects.filter(
+            status__in=OPEN_STATUSES
+        ).order_by('-created_at')[:50]
+
+        for report in reports:
+            results.append({
+                'formId': report.form_id,
+                'reportType': report_type,
+                'itemName': report.item_name,
+                'category': report.category,
+                'campusLocation': report.campus_location,
+                'incidentDate': report.incident_date.isoformat(),
+            })
+
+    results.sort(
+        key=lambda item: item['incidentDate'],
+        reverse=True
+    )
+
+    return Response({'results': results})
+
+
 def _status_filter(request):
     wanted = request.query_params.get('status')
     if wanted and wanted not in OPEN_STATUSES:
