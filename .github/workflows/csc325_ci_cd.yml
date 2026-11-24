@@ -124,6 +124,13 @@ jobs:
       - name: Run AI evaluation tests
         run: python reports/ai_evaluation/test_ai_evaluation.py
 
+
+      - name: Run Golden-Set Evaluation
+        env:
+          PYTHONPATH: .:reports/ai_evaluation
+        run: python reports/ai_evaluation/run_evaluations.py --mock
+
+
   deploy:
     name: Deploy
     needs: [test, backend-test, eval]    
