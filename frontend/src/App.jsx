@@ -12,6 +12,7 @@ import ReportPage from './pages/ReportPage'
 import ReportConfirmationPage from './pages/ReportConfirmationPage'
 import LogoutPage from './pages/LogoutPage'
 import PossibleMatchesPage from './pages/PossibleMatchesPage'
+import SearchPage from './pages/SearchPage'
 import { addLostReportId, readLostReportIds } from './utils/sessionReports'
 
 const knownPages = new Set([
@@ -66,6 +67,8 @@ export default function App() {
   <SignInPage onNavigate={navigate} />
 ) : activePage === 'my-account' ? (
   <AccountPage onNavigate={navigate} />
+) : activePage === 'search' ? (
+  <SearchPage />
 ) : activePage === 'forms' ? (
   <ReportPage onNavigate={navigate} onSubmitted={recordSubmission} />
 ) : activePage === 'report-confirmation' ? (

@@ -885,3 +885,96 @@ class MatchAdminTests(TempMediaMixin, UsersMixin, TestCase):
         self.assertContains(response, f'Matched report(s) updated too: {self.found_id}')
         self.assertEqual(ArchivedReport.objects.count(), 2)
         self.assertEqual(ArchivedReport.objects.get(form_id=self.found_id).matched_form_id, self.lost_id)
+
+
+class PublicReportSearchTests(APITestCase):
+    """Tests for the public Lost & Found search endpoint."""
+
+    def test_search_returns_lost_and_found_reports_without_private_data(self):
+        # Create one lost report and one found report.
+        self.client.post(
+            reverse('report-submit'),
+            payload(itemName='Blue Backpack'),
+            format='json'
+        )
+
+        self.client.post(
+            reverse('report-submit'),
+            payload(
+                reportType='found',
+                itemName='Black Headphones'
+            ),
+            format='json'
+        )
+
+        # Search without authentication.
+        response = self.client.get(reverse('public-report-search'))
+
+        self.assertEqual(response.status_code, 200)
+
+        results = response.data['results']
+        self.assertEqual(len(results), 2)
+
+        names = {item['itemName'] for item in results}
+        types = {item['reportType'] for item in results}
+
+        self.assertEqual(
+            names,
+            {'Blue Backpack', 'Black Headphones'}
+        )
+        self.assertEqual(types, {'lost', 'found'})
+
+        # Only approved public fields should be returned.
+        allowed_fields = {
+            'formId',
+            'reportType',
+            'itemName',
+            'category',
+            'campusLocation',
+            'incidentDate',
+        }
+
+        for item in results:
+            self.assertEqual(set(item.keys()), allowed_fields)
+            self.assertNotIn('fullName', item)
+            self.assertNotIn('email', item)
+            self.assertNotIn('studentId', item)
+            self.assertNotIn('phone', item)
+            self.assertNotIn('description', item)
+
+
+    def test_search_excludes_closed_reports(self):
+        # Create a lost report and a found report.
+        lost_response = self.client.post(
+            reverse('report-submit'),
+            payload(itemName='Closed Backpack'),
+            format='json'
+        )
+
+        self.client.post(
+            reverse('report-submit'),
+            payload(
+                reportType='found',
+                itemName='Found Headphones'
+            ),
+            format='json'
+        )
+
+        self.assertEqual(lost_response.status_code, 201)
+
+        # Simulate a report that is no longer open.
+        LostReport.objects.filter(
+            form_id=lost_response.data['formId']
+        ).update(status='returned')
+
+        response = self.client.get(reverse('public-report-search'))
+
+        self.assertEqual(response.status_code, 200)
+
+        names = {
+            item['itemName']
+            for item in response.data['results']
+        }
+
+        self.assertNotIn('Closed Backpack', names)
+        self.assertIn('Found Headphones', names)
