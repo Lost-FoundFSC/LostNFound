@@ -199,3 +199,51 @@ During development, some AI-assisted work needed corrections.
 
 1)An extra closing bracket caused a syntax error that stopped the React application from loading. The error was identified and fixed by removing the bracket.
 2) A merge conflict happened when another team member updated the testing configuration. The duplicate testing section was reviewed and the conflict was resolved through GitHub.
+
+## Sprint 3: CI/CD and AI Evaluation
+
+The GitHub Actions pipeline includes a dedicated Eval stage that automatically runs the AI evaluation framework on pull requests targeting the main branch. The Deploy stage depends on successful frontend tests, backend tests, and evaluation tests.
+
+### Evaluation Suite
+
+The evaluation framework contains 15 golden test examples representing matching and non-matching lost and found items.
+
+The proposed evaluation thresholds are:
+
+- Matching accuracy: 80% minimum.
+- Consistency across repeated predictions: 90% minimum.
+- Hallucination detection: Identify item names outside the supplied inventory.
+
+The existing nine evaluation framework tests passed locally. A deliberate assertion failure was also tested to verify that unsuccessful tests return a nonzero exit code.
+
+Run the existing evaluation framework from the backend directory using:
+
+`python reports/ai_evaluation/test_ai_evaluation.py`
+
+Actual Claude performance measurements and enforcement of the performance thresholds are pending integration with the completed evaluation runner.
+
+### API Security
+
+The Claude API key must be stored securely using GitHub Actions Secrets and local environment variables. API credentials must not be committed to the repository. Automated unit tests must use mocked AI responses rather than making real API requests.
+
+### Prompt-Injection Risk
+
+A potential prompt-injection vulnerability exists in user-submitted item descriptions. A malicious user could enter instructions telling the AI to ignore its matching criteria and assign an artificially high match score to an unrelated item.
+
+This could produce inaccurate matching results and potentially allow users to claim items that do not belong to them. AI-generated match scores should not be treated as proof of ownership.
+
+This vulnerability has been identified during Sprint 3 and will be addressed during Sprint 4.
+
+### Sanity Check
+
+The current evaluation framework validates the golden dataset and evaluation helper functions. It cannot independently detect changes in Claude's actual behavior because it does not currently execute live model predictions.
+
+Once connected to the live evaluation runner, the golden dataset and performance thresholds can help identify regressions in accuracy, consistency, and hallucination behavior following a model change.
+
+### AI-Use Statement
+
+ChatGPT was used to assist with configuring the GitHub Actions workflow, reviewing the evaluation framework, identifying potential security risks, and preparing project documentation.
+
+During review, I identified that the existing evaluation tests verified the dataset and evaluation functions rather than Claude's actual performance. This distinction was documented to avoid incorrectly reporting that the AI model had passed its performance thresholds.
+
+I also identified and corrected a trailing whitespace issue in the workflow file using Git's diff checking command. The evaluation tests were executed locally, and an intentional assertion failure was used to verify that failed tests return a nonzero exit code.
