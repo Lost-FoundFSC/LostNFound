@@ -95,10 +95,38 @@ jobs:
 
       - name: Run Django automated tests
         run: python manage.py test
+  eval:
+    name: Eval
+    needs: backend-test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DJANGO_SECRET_KEY: ci-only-secret-key-not-for-production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run AI evaluation tests
+        run: python reports/ai_evaluation/test_ai_evaluation.py
 
   deploy:
     name: Deploy
-    needs: [test, backend-test]
+    needs: [test, backend-test, eval]    
     runs-on: ubuntu-latest
     defaults:
       run:
