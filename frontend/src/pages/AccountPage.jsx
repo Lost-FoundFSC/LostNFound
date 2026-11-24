@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { DEMO_ACCOUNT, DEMO_REPORTS, REPORT_STAGES } from '../data/accountDemoData'
 import './AccountPage.css'
+
 
 const ACTIVE_STATUSES = new Set(['reported', 'possible_match', 'under_verification', 'ready_for_pickup'])
 const STATUS_LABELS = Object.fromEntries([...REPORT_STAGES.map(s => [s.id, s.label]), ['closed','Closed'], ['cancelled','Cancelled']])
@@ -24,6 +25,56 @@ function ReportCard({report, onChange, readOnly = false}) {
   const active = ACTIVE_STATUSES.has(report.status) && !report.archiveSemester
   const maxMatch = report.possibleMatches.map(m => safeScore(m.matchScore)).filter(s => s !== null)
   const bestMatch = maxMatch.length ? Math.max(...maxMatch) : null
+
+  const [liveMatch, setLiveMatch] = useState(null)
+  const [matchLoading, setMatchLoading] = useState(false)
+
+  useEffect(() => {
+    if (report.type !== 'lost' || !report.formId) return
+
+    const controller = new AbortController()
+
+    async function checkMatches() {
+      setMatchLoading(true)
+
+      try {
+        const response = await fetch('http://localhost:8000/api/match/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ form_id: report.formId }),
+          signal: controller.signal
+        })
+
+        if (!response.ok) throw new Error('Match request failed')
+
+        const data = await response.json()
+        if (controller.signal.aborted) return
+
+        const validMatches = (data.matches || [])
+          .filter(match => safeScore(match.score) !== null)
+
+        const best = validMatches.length
+          ? validMatches.reduce((a, b) => a.score >= b.score ? a : b)
+          : null
+
+        setLiveMatch({
+          score: best ? safeScore(best.score) : null,
+          source: data.source,
+          reason: best?.reason || ''
+        })
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          setLiveMatch({ error: true })
+        }
+      } finally {
+        if (!controller.signal.aborted) setMatchLoading(false)
+      }
+    }
+
+    checkMatches()
+    return () => controller.abort()
+  }, [report.formId, report.type])
+
   function saveEdit(e) {
     e.preventDefault()
     if (!draft.title.trim() || !draft.location.trim()) return
@@ -39,6 +90,29 @@ function ReportCard({report, onChange, readOnly = false}) {
         <span className="account-chevron">{expanded?'▴':'▾'}</span>
       </button>
       <div className="account-report-meta"><span className="account-type">{report.type === 'lost'?'Lost':'Found'}</span><span>{report.location}</span><span>{prettyDate(report.reportedAt)}</span><Badge status={report.status}/></div>
+
+      {report.type === 'lost' && report.formId && (
+        <div className="account-live-score">
+          {matchLoading ? (
+            <span>Checking matches...</span>
+          ) : liveMatch?.error ? (
+            <span>Match unavailable</span>
+          ) : liveMatch?.score != null ? (
+            <strong>
+              {liveMatch.score}% match
+              <small>
+                {liveMatch.source === 'claude'
+                  ? 'Claude AI'
+                  : liveMatch.source === 'fallback'
+                    ? 'Backup scorer'
+                    : 'Matching service'}
+              </small>
+            </strong>
+          ) : (
+            <span>No matches yet</span>
+          )}
+        </div>
+      )}
       <div className="account-report-actions">
         <button type="button" onClick={()=>{setExpanded(v=>!v);setEditing(false)}}>{expanded?'Hide':'View'}</button>
         {!readOnly && active && <><button type="button" onClick={()=>{setExpanded(true);setEditing(true);setConfirmCancel(false)}}>Edit</button><button type="button" onClick={()=>setConfirmCancel(true)}>Cancel</button></>}
@@ -66,6 +140,7 @@ function ReportCard({report, onChange, readOnly = false}) {
     </div>}
   </article>
 }
+
 
 export default function AccountPage({onNavigate}) {
   const [reports,setReports] = useState(DEMO_REPORTS)

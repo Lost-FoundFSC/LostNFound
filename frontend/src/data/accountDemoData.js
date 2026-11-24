@@ -19,7 +19,22 @@ export const DEMO_REPORTS = [
     { id:'device-quirk', prompt:'What unusual behavior or quirk did the device have?', answer:'the volume-down button sticks' },
     { id:'case-detail', prompt:'What distinctive detail is on the case or an attached accessory?', answer:'a worn yellow star sticker' },
   ]}], claimPending:false },
-  { id:'LF-102', title:'Calculus textbook', category:'Books', type:'lost', location:'Whitman Hall', reportedAt:'2026-10-17', description:'Calculus textbook with a blue bookmark.', status:'reported', archiveSemester:null, possibleMatches:[], claimPending:false },
+
+  {
+    id: 'LF-102',
+    formId: 'L#800000001',
+    title: 'Calculus textbook with red bicycle sticker',
+    category: 'Books',
+    type: 'lost',
+    location: 'Greenley Library',
+    reportedAt: '2026-11-22',
+    description: 'Calculus textbook with a red bicycle sticker.',
+    status: 'reported',
+    archiveSemester: null,
+    possibleMatches: [],
+    claimPending: false,
+  },
+
   { id:'LF-103', title:'Student ID wallet', category:'Wallets & IDs', type:'found', location:'Campus Center', reportedAt:'2026-10-16', description:'Black wallet found near the campus center.', status:'under_verification', archiveSemester:null, possibleMatches:[], claimPending:true },
   { id:'LF-080', title:'Wireless headphones', category:'Electronics', type:'lost', location:'Library', reportedAt:'2026-09-12', description:'Wireless earbuds in black charging case.', status:'returned', archiveSemester:null, possibleMatches:[], claimPending:false },
   { id:'LF-044', title:'Blue backpack', category:'Bags', type:'lost', location:'Student Union', reportedAt:'2026-05-04', description:'Blue canvas backpack with a notebook.', status:'closed', archiveSemester:'Spring 2026', possibleMatches:[], claimPending:false },
